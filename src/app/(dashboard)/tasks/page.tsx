@@ -341,9 +341,10 @@ export default function TasksPage() {
             <div className="col-span-full py-12 text-center text-sm text-[var(--fg-muted)]">
               {t("task.noMatch")}
             </div>
-          ) : filteredNodes.map((node: any) => (
-            <TaskCard key={node.id} node={node} tr={tr} fmt={fmt} t={t} onEdit={() => startEdit(node)} onMutate={mutateAll} projectId={project.id} />
-          ))}
+          ) : filteredNodes.map((node: any) => {
+            const parentNode = node.parentId ? allNodesFlat?.find((n: any) => n.id === node.parentId) : null;
+            return <TaskCard key={node.id} node={node} parentName={parentNode ? tr(parentNode.name) : null} tr={tr} fmt={fmt} t={t} onEdit={() => startEdit(node)} onMutate={mutateAll} projectId={project.id} />;
+          })}
         </div>
       )}
     </div>
@@ -352,8 +353,8 @@ export default function TasksPage() {
 
 // ── Task Card Component (full functionality) ──
 
-function TaskCard({ node, tr, fmt, t, onEdit, onMutate, projectId }: {
-  node: any; tr: (s: string) => string; fmt: (n: number) => string;
+function TaskCard({ node, parentName, tr, fmt, t, onEdit, onMutate, projectId }: {
+  node: any; parentName: string | null; tr: (s: string) => string; fmt: (n: number) => string;
   t: (key: TKey) => string; onEdit: () => void; onMutate: () => void; projectId: string;
 }) {
   const { lang } = useI18n();
@@ -389,6 +390,11 @@ function TaskCard({ node, tr, fmt, t, onEdit, onMutate, projectId }: {
 
       {/* Clickable header area */}
       <div className="cursor-pointer p-4" onClick={() => setExpanded(!expanded)}>
+        {/* Parent breadcrumb */}
+        {parentName && (
+          <p className="mb-1 text-[10px] text-[var(--fg-muted)]">↳ {parentName}</p>
+        )}
+
         {/* Header: name + status + actions */}
         <div className="mb-2 flex items-start justify-between gap-2">
           <h3 className={`text-sm font-bold leading-tight ${isDone ? "text-[var(--fg-muted)] line-through" : "text-[var(--fg)]"}`}>{tr(node.name)}</h3>
