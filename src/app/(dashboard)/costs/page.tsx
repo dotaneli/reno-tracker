@@ -68,19 +68,18 @@ function DonutChart({ segments, size = 200, strokeWidth = 32, fmt }: { segments:
           )}
         </div>
       </div>
-      {/* Legend with amounts */}
-      <div className="flex flex-wrap justify-center gap-x-4 gap-y-1.5">
+      {/* Legend — clean, no amounts (detail shows on hover) */}
+      <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
         {activeSegments.map((seg, i) => (
           <div
             key={i}
-            className={`flex items-center gap-1.5 text-[11px] cursor-pointer rounded-md px-1.5 py-0.5 transition-all ${hover === i ? "bg-[var(--warm-glow)] scale-105" : ""}`}
+            className={`flex items-center gap-1.5 text-[11px] cursor-pointer rounded-md px-1.5 py-0.5 transition-all ${hover === i ? "bg-[var(--warm-glow)]" : ""}`}
             onMouseEnter={() => setHover(i)}
             onMouseLeave={() => setHover(null)}
           >
             <div className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: seg.color }} />
             <span className="text-[var(--fg-muted)]">{seg.label}</span>
-            <span className="font-bold text-[var(--fg)]">{fmt(seg.value)}</span>
-            <span className="text-[var(--fg-muted)]">({Math.round(seg.value / total * 100)}%)</span>
+            <span className="font-semibold text-[var(--fg)]">{Math.round(seg.value / total * 100)}%</span>
           </div>
         ))}
       </div>
