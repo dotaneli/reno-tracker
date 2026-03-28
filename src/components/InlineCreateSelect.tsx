@@ -46,13 +46,13 @@ export function InlineCreateSelect({
           placeholder={onCreateLabel}
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); handleCreate(); } }}
           autoFocus
           className={inp}
         />
-        <button onClick={handleCreate} disabled={saving}
+        <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleCreate(); }} disabled={saving}
           className="shrink-0 rounded-lg bg-[var(--accent)] p-2 text-white"><Check size={14} /></button>
-        <button onClick={() => { setCreating(false); setNewName(""); }}
+        <button type="button" onClick={(e) => { e.preventDefault(); setCreating(false); setNewName(""); }}
           className="shrink-0 rounded-lg bg-[var(--border-subtle)] p-2 text-[var(--fg-secondary)]"><X size={14} /></button>
       </div>
     );

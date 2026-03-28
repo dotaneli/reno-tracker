@@ -9,6 +9,7 @@ import { useFinancials } from "@/hooks/useFinancials";
 import { Card } from "@/components/Card";
 import { NodeTree } from "@/components/NodeTree";
 import { InlineCreateSelect } from "@/components/InlineCreateSelect";
+import { RoomMultiSelect } from "@/components/RoomMultiSelect";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Plus, X, ChevronDown, Search, List, LayoutGrid, ArrowUpDown, Wallet } from "lucide-react";
 import { mutate } from "swr";
@@ -36,6 +37,7 @@ export default function TasksPage() {
   const { data: allNodesFlat } = useApi<any[]>(project ? `/api/nodes?projectId=${project.id}` : null);
   const { data: vendors } = useApi<any[]>(project ? `/api/vendors?projectId=${project.id}` : null);
   const { data: categories } = useApi<any[]>(project ? `/api/categories?projectId=${project.id}` : null);
+  const { data: floors } = useApi<any[]>(project ? `/api/floors?projectId=${project.id}` : null);
   const fin = useFinancials(project?.id);
 
   const allTexts = useMemo(() => [
@@ -105,7 +107,7 @@ export default function TasksPage() {
   const totalCount = allNodesFlat?.length || 0;
 
   // ── Forms ──
-  const [addForm, setAddForm] = useState({ name: "", categoryId: "", vendorId: "", expectedCost: "", expectedDate: "" });
+  const [addForm, setAddForm] = useState({ name: "", categoryId: "", vendorId: "", expectedCost: "", expectedDate: "", roomIds: [] as string[] });
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault(); setError("");
     try {
@@ -114,22 +116,23 @@ export default function TasksPage() {
       if (addForm.vendorId) data.vendorId = addForm.vendorId;
       if (addForm.expectedCost) data.expectedCost = Number(addForm.expectedCost);
       if (addForm.expectedDate) data.expectedDate = addForm.expectedDate;
+      if (addForm.roomIds.length) data.roomIds = addForm.roomIds;
       await apiPost("/api/nodes", data);
-      setAddForm({ name: "", categoryId: "", vendorId: "", expectedCost: "", expectedDate: "" });
+      setAddForm({ name: "", categoryId: "", vendorId: "", expectedCost: "", expectedDate: "", roomIds: [] });
       setShowAddForm(false); mutateAll();
     } catch (err: any) { setError(err.message); }
   };
 
-  const [editForm, setEditForm] = useState({ name: "", parentId: "", vendorId: "", categoryId: "", expectedCost: "", expectedDate: "", status: "PENDING" });
+  const [editForm, setEditForm] = useState({ name: "", parentId: "", vendorId: "", categoryId: "", expectedCost: "", expectedDate: "", status: "PENDING", roomIds: [] as string[] });
   const startEdit = (node: any) => {
-    setEditForm({ name: node.name, parentId: node.parentId || "", vendorId: node.vendorId || "", categoryId: node.categoryId || "", expectedCost: node.expectedCost ? String(Number(node.expectedCost)) : "", expectedDate: node.expectedDate ? node.expectedDate.split("T")[0] : "", status: node.status });
+    setEditForm({ name: node.name, parentId: node.parentId || "", vendorId: node.vendorId || "", categoryId: node.categoryId || "", expectedCost: node.expectedCost ? String(Number(node.expectedCost)) : "", expectedDate: node.expectedDate ? node.expectedDate.split("T")[0] : "", status: node.status, roomIds: node.rooms?.map((r: any) => r.roomId) || [] });
     setEditNodeId(node.id); setShowEditForm(true); setShowAddForm(false);
   };
-  const resetEdit = () => { setEditForm({ name: "", parentId: "", vendorId: "", categoryId: "", expectedCost: "", expectedDate: "", status: "PENDING" }); setEditNodeId(null); setShowEditForm(false); };
+  const resetEdit = () => { setEditForm({ name: "", parentId: "", vendorId: "", categoryId: "", expectedCost: "", expectedDate: "", status: "PENDING", roomIds: [] }); setEditNodeId(null); setShowEditForm(false); };
   const handleEdit = async (e: React.FormEvent) => {
     e.preventDefault(); setError("");
     try {
-      await apiPatch(`/api/nodes/${editNodeId}`, { name: editForm.name, parentId: editForm.parentId || null, vendorId: editForm.vendorId || null, categoryId: editForm.categoryId || null, expectedCost: editForm.expectedCost ? Number(editForm.expectedCost) : null, expectedDate: editForm.expectedDate || null, status: editForm.status });
+      await apiPatch(`/api/nodes/${editNodeId}`, { name: editForm.name, parentId: editForm.parentId || null, vendorId: editForm.vendorId || null, categoryId: editForm.categoryId || null, expectedCost: editForm.expectedCost ? Number(editForm.expectedCost) : null, expectedDate: editForm.expectedDate || null, status: editForm.status, roomIds: editForm.roomIds });
       resetEdit(); mutateAll();
     } catch (err: any) { setError(err.message); }
   };
@@ -262,6 +265,9 @@ export default function TasksPage() {
               />
               <input type="number" placeholder="₪" value={addForm.expectedCost} onChange={(e) => setAddForm({ ...addForm, expectedCost: e.target.value })} className={input} />
             </div>
+            {floors && floors.length > 0 && (
+              <RoomMultiSelect value={addForm.roomIds} onChange={(ids) => setAddForm({ ...addForm, roomIds: ids })} floors={floors} tr={tr} />
+            )}
             {error && !showEditForm && <p className="text-xs font-medium text-[var(--alert)]">{error}</p>}
             <button type="submit" className="w-full rounded-xl bg-[var(--accent)] py-3 text-sm font-semibold text-white shadow-md shadow-[var(--accent)]/20">{t("task.save")}</button>
           </form>
@@ -305,6 +311,9 @@ export default function TasksPage() {
                 <ChevronDown size={14} className="pointer-events-none absolute end-3.5 top-1/2 -translate-y-1/2 text-[var(--fg-muted)]" />
               </div>
             </div>
+            {floors && floors.length > 0 && (
+              <RoomMultiSelect value={editForm.roomIds} onChange={(ids) => setEditForm({ ...editForm, roomIds: ids })} floors={floors} tr={tr} />
+            )}
             {error && <p className="text-xs font-medium text-[var(--alert)]">{error}</p>}
             <div className="flex gap-3">
               <button type="submit" className="flex-1 rounded-xl bg-[var(--accent)] py-3 text-sm font-semibold text-white">{t("task.save")}</button>
