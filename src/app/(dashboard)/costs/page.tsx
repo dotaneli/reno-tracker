@@ -10,7 +10,7 @@ import { Card, StatCard } from "@/components/Card";
 import { Expandable } from "@/components/Expandable";
 import { TaskLine, MilestoneLine } from "@/components/TaskLine";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Wallet, TrendingUp, AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, PiggyBank } from "lucide-react";
+import { Wallet, TrendingUp, AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, PiggyBank, CircleDollarSign, CheckCircle2 } from "lucide-react";
 
 export default function CostsPage() {
   const { t, lang } = useI18n();
@@ -119,6 +119,90 @@ export default function CostsPage() {
           <div className="h-full rounded-full transition-all duration-700" style={{ width: `${Math.min(fin.paidPct, 100)}%`, background: "linear-gradient(90deg, var(--success), #78B080)" }} />
         </div>
       </Card>
+
+      {/* ── Unpaid Payments Deepdive ── */}
+      {(() => {
+        const unpaid = ms.filter((m: any) => m.status !== "PAID");
+        const unpaidTotal = unpaid.reduce((s: number, m: any) => s + Number(m.amount), 0);
+        // Group by task
+        const byTask = new Map<string, { taskName: string; milestones: any[] }>();
+        for (const m of unpaid) {
+          const key = m.nodeId || "unknown";
+          if (!byTask.has(key)) byTask.set(key, { taskName: m.nodeName || "—", milestones: [] });
+          byTask.get(key)!.milestones.push(m);
+        }
+        const groups = Array.from(byTask.values()).sort((a, b) => {
+          const aTotal = a.milestones.reduce((s: number, m: any) => s + Number(m.amount), 0);
+          const bTotal = b.milestones.reduce((s: number, m: any) => s + Number(m.amount), 0);
+          return bTotal - aTotal;
+        });
+
+        return (
+          <div>
+            <h2 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.15em] text-[var(--fg-muted)]">
+              <CircleDollarSign size={14} className={unpaid.length > 0 ? "text-[var(--alert)]" : "text-[var(--success)]"} />
+              {t("costs.unpaidBreakdown")}
+              {unpaid.length > 0 && (
+                <span className="rounded-full bg-[var(--alert-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--alert)]">{unpaid.length} · {fmt(unpaidTotal)}</span>
+              )}
+            </h2>
+            {groups.length === 0 ? (
+              <Card>
+                <div className="flex items-center gap-2 py-4 justify-center">
+                  <CheckCircle2 size={16} className="text-[var(--success)]" />
+                  <p className="text-sm font-medium text-[var(--success)]">{t("costs.noUnpaid")}</p>
+                </div>
+              </Card>
+            ) : (
+              <div className="space-y-2">
+                {groups.map((group) => {
+                  const groupTotal = group.milestones.reduce((s: number, m: any) => s + Number(m.amount), 0);
+                  const hasOverdue = group.milestones.some((m: any) => m.dueDate && new Date(m.dueDate) < new Date() && m.status !== "PAID");
+                  return (
+                    <Card key={group.taskName} className={hasOverdue ? "border-[var(--alert)]/20" : ""}>
+                      <Expandable trigger={
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold text-[var(--fg)]">{tr(group.taskName)}</p>
+                            <p className="text-[11px] text-[var(--fg-muted)]">
+                              {group.milestones.length} {t("task.milestones").toLowerCase()}
+                              {hasOverdue && <span className="ms-2 text-[var(--alert)]">{t("costs.overdue")}</span>}
+                            </p>
+                          </div>
+                          <p className={`text-sm font-bold ${hasOverdue ? "text-[var(--alert)]" : "text-[var(--fg)]"}`}>{fmt(groupTotal)}</p>
+                        </div>
+                      }>
+                        <div className="space-y-1 rounded-lg bg-[var(--bg)] p-2">
+                          {group.milestones.map((m: any) => {
+                            const isOverdue = m.dueDate && new Date(m.dueDate) < new Date();
+                            return (
+                              <div key={m.id} className="flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-xs hover:bg-[var(--warm-glow)]">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="font-medium text-[var(--fg)]">{m.label}</span>
+                                  {m.dueDate && (
+                                    <span className={`text-[11px] ${isOverdue ? "font-semibold text-[var(--alert)]" : "text-[var(--fg-muted)]"}`}>
+                                      {new Date(m.dueDate).toLocaleDateString(lang === "he" ? "he-IL" : "en-IL", { day: "numeric", month: "short" })}
+                                      {isOverdue && " ⚠️"}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <span className="font-semibold">{fmt(Number(m.amount))}</span>
+                                  <StatusBadge status={m.status} />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </Expandable>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Per task group — expandable with tasks AND milestones */}
       {nodeBreakdown.length > 0 && (

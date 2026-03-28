@@ -13,7 +13,7 @@ import { RoomMultiSelect } from "@/components/RoomMultiSelect";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ItemMilestones } from "@/components/ItemMilestones";
 import { InlineNodeEdit } from "@/components/InlineNodeEdit";
-import { Plus, X, ChevronDown, Search, List, LayoutGrid, ArrowUpDown, Wallet, CheckCircle2, Pencil, Trash2 } from "lucide-react";
+import { Plus, X, ChevronDown, Search, List, LayoutGrid, ArrowUpDown, Wallet, CheckCircle2, Pencil, Trash2, CircleDollarSign } from "lucide-react";
 import { mutate } from "swr";
 
 const input = "w-full rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] px-4 py-3 text-sm text-[var(--fg)] placeholder-[var(--fg-muted)]/60 outline-none transition-all focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/10";
@@ -32,6 +32,7 @@ export default function TasksPage() {
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("default");
+  const [unpaidOnly, setUnpaidOnly] = useState(false);
 
   const { activeProject: project } = useProject();
   const { data: tree } = useApi<any[]>(project ? `/api/nodes?projectId=${project.id}&tree=true` : null);
@@ -52,9 +53,17 @@ export default function TasksPage() {
 
   const fmt = (n: number) => new Intl.NumberFormat(lang === "he" ? "he-IL" : "en-IL", { style: "currency", currency: "ILS", maximumFractionDigits: 0 }).format(n);
 
-  // ── Search & Sort (for card view — operates on flat list) ──
+  // ── Search, Filter & Sort (for card view — operates on flat list) ──
   const filteredNodes = useMemo(() => {
     let nodes = allNodesFlat || [];
+    // Unpaid filter
+    if (unpaidOnly) {
+      nodes = nodes.filter((n: any) => {
+        const cost = Number(n.expectedCost || 0);
+        const paid = Number(n._paid || 0);
+        return cost > 0 && paid < cost;
+      });
+    }
     // Search
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -85,24 +94,42 @@ export default function TasksPage() {
     return nodes;
   }, [allNodesFlat, searchQuery, sortKey, tr]);
 
-  // Filter tree for search (in list view)
+  // Filter tree for search + unpaid (in list view)
   const filteredTree = useMemo(() => {
-    if (!tree || !searchQuery.trim()) return tree;
-    const q = searchQuery.toLowerCase();
+    if (!tree) return tree;
+    const hasSearch = searchQuery.trim();
+    const q = hasSearch ? searchQuery.toLowerCase() : "";
+
+    function isUnpaid(node: any): boolean {
+      const cost = Number(node.expectedCost || 0);
+      const paid = Number(node._paid || 0);
+      if (cost > 0 && paid < cost) return true;
+      return node.children?.some((c: any) => isUnpaid(c)) || false;
+    }
+
     function matchesSearch(node: any): boolean {
       if (node.name?.toLowerCase().includes(q) || tr(node.name)?.toLowerCase().includes(q) ||
           node.vendor?.name?.toLowerCase().includes(q) || node.category?.name?.toLowerCase().includes(q))
         return true;
       return node.children?.some((c: any) => matchesSearch(c)) || false;
     }
+
+    function matchesFilters(node: any): boolean {
+      if (unpaidOnly && !isUnpaid(node)) return false;
+      if (hasSearch && !matchesSearch(node)) return false;
+      return true;
+    }
+
+    if (!hasSearch && !unpaidOnly) return tree;
+
     function filterNode(node: any): any | null {
-      if (matchesSearch(node)) {
+      if (matchesFilters(node)) {
         return { ...node, children: node.children?.map(filterNode).filter(Boolean) || [] };
       }
       return null;
     }
     return tree.map(filterNode).filter(Boolean);
-  }, [tree, searchQuery, tr]);
+  }, [tree, searchQuery, unpaidOnly, tr]);
 
   const rootCount = tree?.length || 0;
   const totalCount = allNodesFlat?.length || 0;
@@ -218,6 +245,15 @@ export default function TasksPage() {
           </select>
           <ChevronDown size={12} className="pointer-events-none absolute end-2.5 top-1/2 -translate-y-1/2 text-[var(--fg-muted)]" />
         </div>
+
+        {/* Unpaid Filter */}
+        <button
+          onClick={() => setUnpaidOnly(!unpaidOnly)}
+          className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium transition-all ${unpaidOnly ? "border-[var(--alert)]/40 bg-[var(--alert-soft)] text-[var(--alert)]" : "border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--fg-muted)] hover:text-[var(--fg)]"}`}
+        >
+          <CircleDollarSign size={14} />
+          {t("costs.unpaidOnly")}
+        </button>
 
         {/* View Toggle */}
         <div className="flex rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] p-0.5">
