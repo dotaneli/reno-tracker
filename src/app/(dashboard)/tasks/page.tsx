@@ -13,7 +13,7 @@ import { RoomMultiSelect } from "@/components/RoomMultiSelect";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ItemMilestones } from "@/components/ItemMilestones";
 import { InlineNodeEdit } from "@/components/InlineNodeEdit";
-import { Plus, X, ChevronDown, Search, List, LayoutGrid, ArrowUpDown, Wallet, CheckCircle2, Pencil, Trash2, CircleDollarSign } from "lucide-react";
+import { Plus, X, ChevronDown, Search, List, LayoutGrid, ArrowUpDown, Wallet, CheckCircle2, CircleDollarSign, Pencil, Trash2 } from "lucide-react";
 import { mutate } from "swr";
 
 const input = "w-full rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] px-4 py-3 text-sm text-[var(--fg)] placeholder-[var(--fg-muted)]/60 outline-none transition-all focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/10";
@@ -353,6 +353,12 @@ function TaskCard({ node, parentName, tr, fmt, t, isEditing, onEdit, onEditDone,
     onMutate();
   };
 
+  const handleMarkPaid = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    await fetch(`/api/nodes/${node.id}/paid`, { method: "POST" });
+    onMutate();
+  };
+
   const handleDelete = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!confirm(t("task.deleteConfirm").replace("{name}", node.name))) return;
@@ -450,6 +456,11 @@ function TaskCard({ node, parentName, tr, fmt, t, isEditing, onEdit, onEditDone,
             {!isDone && (
               <button onClick={handleMarkDone} className="flex items-center gap-1.5 rounded-lg bg-[var(--success-soft)] px-3 py-2 text-xs font-semibold text-[var(--success)] transition-all hover:bg-[var(--success)] hover:text-white">
                 <CheckCircle2 size={14} /> {t("task.markDone")}
+              </button>
+            )}
+            {cost > 0 && paid < cost && (
+              <button onClick={handleMarkPaid} className="flex items-center gap-1.5 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-600 transition-all hover:bg-amber-500 hover:text-white">
+                <CircleDollarSign size={14} /> {t("task.markPaid")}
               </button>
             )}
             <button onClick={(e) => { e.stopPropagation(); if (isEditing) onEditCancel(); else onEdit(); }} className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-all ${isEditing ? "bg-[var(--accent)] text-white hover:bg-[var(--alert)]" : "bg-[var(--fg)]/5 text-[var(--fg)] hover:bg-[var(--accent)] hover:text-white"}`}>

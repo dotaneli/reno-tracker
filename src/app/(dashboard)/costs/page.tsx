@@ -120,33 +120,50 @@ export default function CostsPage() {
         </div>
       </Card>
 
-      {/* ── Unpaid Payments Deepdive ── */}
+      {/* ── Unpaid Deepdive: milestones + tasks with cost but no payments ── */}
       {(() => {
-        const unpaid = ms.filter((m: any) => m.status !== "PAID");
-        const unpaidTotal = unpaid.reduce((s: number, m: any) => s + Number(m.amount), 0);
-        // Group by task
-        const byTask = new Map<string, { taskName: string; milestones: any[] }>();
-        for (const m of unpaid) {
+        // 1. Unpaid milestones grouped by task
+        const unpaidMs = ms.filter((m: any) => m.status !== "PAID");
+        const unpaidMsTotal = unpaidMs.reduce((s: number, m: any) => s + Number(m.amount), 0);
+        const msNodeIds = new Set(ms.map((m: any) => m.nodeId));
+
+        // 2. Tasks with cost but NO milestones at all
+        const noPaymentTasks = (allNodes || []).filter((n: any) => Number(n.expectedCost) > 0 && !msNodeIds.has(n.id));
+        const noPaymentTotal = noPaymentTasks.reduce((s: number, n: any) => s + Number(n.expectedCost), 0);
+
+        // 3. Tasks with milestones but not fully paid (gap between cost and paid)
+        const partiallyPaidNodeIds = new Set<string>();
+        const byTask = new Map<string, { taskName: string; taskCost: number; taskPaid: number; milestones: any[] }>();
+        for (const m of unpaidMs) {
           const key = m.nodeId || "unknown";
-          if (!byTask.has(key)) byTask.set(key, { taskName: m.nodeName || "—", milestones: [] });
+          if (!byTask.has(key)) {
+            const node = (allNodes || []).find((n: any) => n.id === key);
+            byTask.set(key, { taskName: m.nodeName || "—", taskCost: Number(node?.expectedCost || 0), taskPaid: Number(node?._paid || 0), milestones: [] });
+          }
           byTask.get(key)!.milestones.push(m);
+          partiallyPaidNodeIds.add(key);
         }
-        const groups = Array.from(byTask.values()).sort((a, b) => {
-          const aTotal = a.milestones.reduce((s: number, m: any) => s + Number(m.amount), 0);
-          const bTotal = b.milestones.reduce((s: number, m: any) => s + Number(m.amount), 0);
-          return bTotal - aTotal;
+
+        const msGroups = Array.from(byTask.values()).sort((a, b) => {
+          const aUnpaid = a.milestones.reduce((s: number, m: any) => s + Number(m.amount), 0);
+          const bUnpaid = b.milestones.reduce((s: number, m: any) => s + Number(m.amount), 0);
+          return bUnpaid - aUnpaid;
         });
+
+        const grandUnpaid = unpaidMsTotal + noPaymentTotal;
+        const totalItems = msGroups.length + noPaymentTasks.length;
+        const hasAny = totalItems > 0;
 
         return (
           <div>
             <h2 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.15em] text-[var(--fg-muted)]">
-              <CircleDollarSign size={14} className={unpaid.length > 0 ? "text-[var(--alert)]" : "text-[var(--success)]"} />
+              <CircleDollarSign size={14} className={hasAny ? "text-[var(--alert)]" : "text-[var(--success)]"} />
               {t("costs.unpaidBreakdown")}
-              {unpaid.length > 0 && (
-                <span className="rounded-full bg-[var(--alert-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--alert)]">{unpaid.length} · {fmt(unpaidTotal)}</span>
+              {hasAny && (
+                <span className="rounded-full bg-[var(--alert-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--alert)]">{totalItems} · {fmt(grandUnpaid)}</span>
               )}
             </h2>
-            {groups.length === 0 ? (
+            {!hasAny ? (
               <Card>
                 <div className="flex items-center gap-2 py-4 justify-center">
                   <CheckCircle2 size={16} className="text-[var(--success)]" />
@@ -155,9 +172,10 @@ export default function CostsPage() {
               </Card>
             ) : (
               <div className="space-y-2">
-                {groups.map((group) => {
-                  const groupTotal = group.milestones.reduce((s: number, m: any) => s + Number(m.amount), 0);
-                  const hasOverdue = group.milestones.some((m: any) => m.dueDate && new Date(m.dueDate) < new Date() && m.status !== "PAID");
+                {/* Tasks with unpaid milestones */}
+                {msGroups.map((group) => {
+                  const groupUnpaid = group.milestones.reduce((s: number, m: any) => s + Number(m.amount), 0);
+                  const hasOverdue = group.milestones.some((m: any) => m.dueDate && new Date(m.dueDate) < new Date());
                   return (
                     <Card key={group.taskName} className={hasOverdue ? "border-[var(--alert)]/20" : ""}>
                       <Expandable trigger={
@@ -166,10 +184,11 @@ export default function CostsPage() {
                             <p className="text-sm font-semibold text-[var(--fg)]">{tr(group.taskName)}</p>
                             <p className="text-[11px] text-[var(--fg-muted)]">
                               {group.milestones.length} {t("task.milestones").toLowerCase()}
+                              {group.taskCost > 0 && <> · {fmt(group.taskPaid)} / {fmt(group.taskCost)}</>}
                               {hasOverdue && <span className="ms-2 text-[var(--alert)]">{t("costs.overdue")}</span>}
                             </p>
                           </div>
-                          <p className={`text-sm font-bold ${hasOverdue ? "text-[var(--alert)]" : "text-[var(--fg)]"}`}>{fmt(groupTotal)}</p>
+                          <p className={`text-sm font-bold ${hasOverdue ? "text-[var(--alert)]" : "text-[var(--fg)]"}`}>{fmt(groupUnpaid)}</p>
                         </div>
                       }>
                         <div className="space-y-1 rounded-lg bg-[var(--bg)] p-2">
@@ -182,7 +201,6 @@ export default function CostsPage() {
                                   {m.dueDate && (
                                     <span className={`text-[11px] ${isOverdue ? "font-semibold text-[var(--alert)]" : "text-[var(--fg-muted)]"}`}>
                                       {new Date(m.dueDate).toLocaleDateString(lang === "he" ? "he-IL" : "en-IL", { day: "numeric", month: "short" })}
-                                      {isOverdue && " ⚠️"}
                                     </span>
                                   )}
                                 </div>
@@ -198,6 +216,24 @@ export default function CostsPage() {
                     </Card>
                   );
                 })}
+
+                {/* Tasks with cost but NO payments at all */}
+                {noPaymentTasks.length > 0 && (
+                  <>
+                    <p className="mt-2 text-[10px] font-bold uppercase tracking-wider text-[var(--fg-muted)]">{t("costs.unscheduled")} — {noPaymentTasks.length} · {fmt(noPaymentTotal)}</p>
+                    {noPaymentTasks.sort((a: any, b: any) => Number(b.expectedCost) - Number(a.expectedCost)).map((n: any) => (
+                      <Card key={n.id}>
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-[var(--fg)]">{tr(n.name)}</p>
+                            <p className="text-[11px] text-[var(--fg-muted)]">{n.vendor?.name ? tr(n.vendor.name) : ""}{n.category?.name ? ` · ${tr(n.category.name)}` : ""}</p>
+                          </div>
+                          <p className="text-sm font-bold text-[var(--alert)]">{fmt(Number(n.expectedCost))}</p>
+                        </div>
+                      </Card>
+                    ))}
+                  </>
+                )}
               </div>
             )}
           </div>

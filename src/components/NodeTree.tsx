@@ -12,7 +12,7 @@ import {
 } from "@dnd-kit/core";
 import { useDraggable } from "@dnd-kit/core";
 import { InlineNodeEdit } from "./InlineNodeEdit";
-import { ChevronRight, DollarSign, Calendar, Pencil, X, Trash2, Plus, GripVertical, CornerLeftUp, CheckCircle2 } from "lucide-react";
+import { ChevronRight, DollarSign, Calendar, Pencil, X, Trash2, Plus, GripVertical, CornerLeftUp, CheckCircle2, CircleDollarSign } from "lucide-react";
 
 const inp = "w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)] placeholder-[var(--fg-muted)]/60 outline-none focus:border-[var(--accent)]";
 
@@ -131,6 +131,7 @@ function NodeRow({ node, depth = 0, projectId, vendors, categories, floors, allN
   const isDone = node.status === "COMPLETED";
 
   const handleMarkDone = async () => { await fetch(`/api/nodes/${node.id}/done`, { method: "POST" }); onMutate(); };
+  const handleMarkPaid = async () => { await fetch(`/api/nodes/${node.id}/paid`, { method: "POST" }); onMutate(); };
   const handleDelete = async () => { if (!confirm(t("task.deleteConfirm").replace("{name}", node.name))) return; await apiDelete(`/api/nodes/${node.id}`); onMutate(); };
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -212,6 +213,11 @@ function NodeRow({ node, depth = 0, projectId, vendors, categories, floors, allN
             {!isDone && (
               <button onClick={handleMarkDone} className="rounded-lg bg-[var(--success-soft)] p-1.5 text-[var(--success)] hover:bg-[var(--success)] hover:text-white" title={t("task.markDone")}>
                 <CheckCircle2 size={14} />
+              </button>
+            )}
+            {hasCost && totalPaid < totalCost && (
+              <button onClick={handleMarkPaid} className="rounded-lg bg-amber-50 p-1.5 text-amber-600 hover:bg-amber-500 hover:text-white" title={t("task.markPaid")}>
+                <CircleDollarSign size={14} />
               </button>
             )}
             {hasCost && (

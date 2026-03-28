@@ -182,6 +182,8 @@ const dict = {
   "costs.allPayments": { en: "All payments", he: "כל התשלומים" },
   "costs.unpaidBreakdown": { en: "Unpaid Payments", he: "תשלומים שלא שולמו" },
   "costs.noUnpaid": { en: "All payments are up to date", he: "כל התשלומים מעודכנים" },
+  "task.markPaid": { en: "Mark as Paid", he: "סמן כשולם" },
+  "task.markedPaid": { en: "Marked as paid", he: "סומן כשולם" },
   "prop.selectFloor": { en: "Select floor", he: "בחר קומה" },
   "export.title": { en: "Export & Share", he: "ייצוא ושיתוף" },
   "export.sheets": { en: "Google Sheets", he: "Google Sheets" },
