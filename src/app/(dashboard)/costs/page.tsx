@@ -120,38 +120,51 @@ export default function CostsPage() {
         </div>
       </Card>
 
-      {/* ── Unpaid Deepdive: milestones + tasks with cost but no payments ── */}
+      {/* ── Unpaid Deepdive: milestones + gap + unscheduled tasks ── */}
       {(() => {
-        // 1. Unpaid milestones grouped by task
-        const unpaidMs = ms.filter((m: any) => m.status !== "PAID");
-        const unpaidMsTotal = unpaidMs.reduce((s: number, m: any) => s + Number(m.amount), 0);
-        const msNodeIds = new Set(ms.map((m: any) => m.nodeId));
-
-        // 2. Tasks with cost but NO milestones at all
-        const noPaymentTasks = (allNodes || []).filter((n: any) => Number(n.expectedCost) > 0 && !msNodeIds.has(n.id));
-        const noPaymentTotal = noPaymentTasks.reduce((s: number, n: any) => s + Number(n.expectedCost), 0);
-
-        // 3. Tasks with milestones but not fully paid (gap between cost and paid)
-        const partiallyPaidNodeIds = new Set<string>();
-        const byTask = new Map<string, { taskName: string; taskCost: number; taskPaid: number; milestones: any[] }>();
-        for (const m of unpaidMs) {
-          const key = m.nodeId || "unknown";
-          if (!byTask.has(key)) {
-            const node = (allNodes || []).find((n: any) => n.id === key);
-            byTask.set(key, { taskName: m.nodeName || "—", taskCost: Number(node?.expectedCost || 0), taskPaid: Number(node?._paid || 0), milestones: [] });
-          }
-          byTask.get(key)!.milestones.push(m);
-          partiallyPaidNodeIds.add(key);
+        // Build per-node payment picture
+        const nodePayments = new Map<string, { milestoned: number; paid: number; unpaidMs: any[] }>();
+        for (const m of ms) {
+          if (!nodePayments.has(m.nodeId)) nodePayments.set(m.nodeId, { milestoned: 0, paid: 0, unpaidMs: [] });
+          const np = nodePayments.get(m.nodeId)!;
+          np.milestoned += Number(m.amount);
+          if (m.status === "PAID") np.paid += Number(m.amount);
+          else np.unpaidMs.push(m);
         }
 
-        const msGroups = Array.from(byTask.values()).sort((a, b) => {
-          const aUnpaid = a.milestones.reduce((s: number, m: any) => s + Number(m.amount), 0);
-          const bUnpaid = b.milestones.reduce((s: number, m: any) => s + Number(m.amount), 0);
-          return bUnpaid - aUnpaid;
+        // 1. Tasks with unpaid milestones (grouped, includes gap info)
+        const msGroups: { nodeId: string; taskName: string; taskCost: number; taskPaid: number; unpaidMs: any[]; gap: number }[] = [];
+        for (const [nodeId, np] of nodePayments) {
+          if (np.unpaidMs.length === 0) {
+            // All milestones paid — but is there a gap?
+            const node = (allNodes || []).find((n: any) => n.id === nodeId);
+            const cost = Number(node?.expectedCost || 0);
+            const gap = cost - np.milestoned;
+            if (gap > 0) {
+              msGroups.push({ nodeId, taskName: node?.name || "—", taskCost: cost, taskPaid: np.paid, unpaidMs: [], gap });
+            }
+            continue;
+          }
+          const node = (allNodes || []).find((n: any) => n.id === nodeId);
+          const cost = Number(node?.expectedCost || 0);
+          const gap = cost > np.milestoned ? cost - np.milestoned : 0;
+          msGroups.push({ nodeId, taskName: np.unpaidMs[0]?.nodeName || node?.name || "—", taskCost: cost, taskPaid: np.paid, unpaidMs: np.unpaidMs, gap });
+        }
+        msGroups.sort((a, b) => {
+          const aTotal = a.unpaidMs.reduce((s: number, m: any) => s + Number(m.amount), 0) + a.gap;
+          const bTotal = b.unpaidMs.reduce((s: number, m: any) => s + Number(m.amount), 0) + b.gap;
+          return bTotal - aTotal;
         });
+        // Filter out groups with nothing owed
+        const activeGroups = msGroups.filter(g => g.unpaidMs.length > 0 || g.gap > 0);
 
-        const grandUnpaid = unpaidMsTotal + noPaymentTotal;
-        const totalItems = msGroups.length + noPaymentTasks.length;
+        // 2. Tasks with cost but NO milestones at all
+        const noPaymentTasks = (allNodes || []).filter((n: any) => Number(n.expectedCost) > 0 && !nodePayments.has(n.id));
+        const noPaymentTotal = noPaymentTasks.reduce((s: number, n: any) => s + Number(n.expectedCost), 0);
+
+        // Grand total = what "Remaining to Pay" shows
+        const grandUnpaid = fin.remainingToPay;
+        const totalItems = activeGroups.length + noPaymentTasks.length;
         const hasAny = totalItems > 0;
 
         return (
@@ -172,27 +185,29 @@ export default function CostsPage() {
               </Card>
             ) : (
               <div className="space-y-2">
-                {/* Tasks with unpaid milestones */}
-                {msGroups.map((group) => {
-                  const groupUnpaid = group.milestones.reduce((s: number, m: any) => s + Number(m.amount), 0);
-                  const hasOverdue = group.milestones.some((m: any) => m.dueDate && new Date(m.dueDate) < new Date());
+                {/* Tasks with unpaid milestones and/or gaps */}
+                {activeGroups.map((group) => {
+                  const msUnpaid = group.unpaidMs.reduce((s: number, m: any) => s + Number(m.amount), 0);
+                  const groupTotal = msUnpaid + group.gap;
+                  const hasOverdue = group.unpaidMs.some((m: any) => m.dueDate && new Date(m.dueDate) < new Date());
                   return (
-                    <Card key={group.taskName} className={hasOverdue ? "border-[var(--alert)]/20" : ""}>
+                    <Card key={group.nodeId} className={hasOverdue ? "border-[var(--alert)]/20" : ""}>
                       <Expandable trigger={
                         <div className="flex items-center justify-between gap-3">
                           <div className="min-w-0 flex-1">
                             <p className="text-sm font-semibold text-[var(--fg)]">{tr(group.taskName)}</p>
                             <p className="text-[11px] text-[var(--fg-muted)]">
-                              {group.milestones.length} {t("task.milestones").toLowerCase()}
-                              {group.taskCost > 0 && <> · {fmt(group.taskPaid)} / {fmt(group.taskCost)}</>}
+                              {group.taskCost > 0 && <>{fmt(group.taskPaid)} / {fmt(group.taskCost)}</>}
+                              {group.unpaidMs.length > 0 && <> · {group.unpaidMs.length} {t("task.milestones").toLowerCase()}</>}
+                              {group.gap > 0 && <> · {fmt(group.gap)} {t("costs.unscheduled").toLowerCase()}</>}
                               {hasOverdue && <span className="ms-2 text-[var(--alert)]">{t("costs.overdue")}</span>}
                             </p>
                           </div>
-                          <p className={`text-sm font-bold ${hasOverdue ? "text-[var(--alert)]" : "text-[var(--fg)]"}`}>{fmt(groupUnpaid)}</p>
+                          <p className={`text-sm font-bold ${hasOverdue ? "text-[var(--alert)]" : "text-[var(--fg)]"}`}>{fmt(groupTotal)}</p>
                         </div>
                       }>
                         <div className="space-y-1 rounded-lg bg-[var(--bg)] p-2">
-                          {group.milestones.map((m: any) => {
+                          {group.unpaidMs.map((m: any) => {
                             const isOverdue = m.dueDate && new Date(m.dueDate) < new Date();
                             return (
                               <div key={m.id} className="flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-xs hover:bg-[var(--warm-glow)]">
@@ -211,6 +226,12 @@ export default function CostsPage() {
                               </div>
                             );
                           })}
+                          {group.gap > 0 && (
+                            <div className="flex items-center justify-between gap-3 rounded-lg bg-amber-50 px-2 py-1.5 text-xs">
+                              <span className="font-medium text-amber-700">{t("costs.unscheduled")}</span>
+                              <span className="font-semibold text-amber-700">{fmt(group.gap)}</span>
+                            </div>
+                          )}
                         </div>
                       </Expandable>
                     </Card>
