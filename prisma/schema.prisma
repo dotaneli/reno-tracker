@@ -1,0 +1,122 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Project {
+  id           String   @id @default(cuid())
+  name         String
+  totalBudget  Decimal  @db.Decimal(12, 2)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  phases       Phase[]
+
+  @@map("projects")
+}
+
+model Phase {
+  id        String      @id @default(cuid())
+  name      String
+  status    PhaseStatus @default(NOT_STARTED)
+  startDate DateTime?
+  endDate   DateTime?
+  projectId String
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  project   Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  items     Item[]
+  issues    Issue[]
+
+  @@map("phases")
+}
+
+model Vendor {
+  id        String   @id @default(cuid())
+  name      String
+  category  String?
+  phone     String?
+  email     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items     Item[]
+
+  @@map("vendors")
+}
+
+model Item {
+  id           String     @id @default(cuid())
+  name         String
+  expectedCost Decimal?   @db.Decimal(12, 2)
+  actualCost   Decimal?   @db.Decimal(12, 2)
+  status       ItemStatus @default(PENDING)
+  phaseId      String
+  vendorId     String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  phase        Phase      @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+  vendor       Vendor?    @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+
+  @@map("items")
+}
+
+model Issue {
+  id          String      @id @default(cuid())
+  title       String
+  description String?
+  status      IssueStatus @default(OPEN)
+  phaseId     String
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  phase       Phase       @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+
+  @@map("issues")
+}
+
+model PendingInbox {
+  id          String       @id @default(cuid())
+  source      String
+  rawPayload  Json
+  status      InboxStatus  @default(PENDING)
+  processedAt DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@map("pending_inbox")
+}
+
+enum PhaseStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  ON_HOLD
+}
+
+enum ItemStatus {
+  PENDING
+  ORDERED
+  DELIVERED
+  INSTALLED
+  CANCELLED
+}
+
+enum IssueStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+}
+
+enum InboxStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
