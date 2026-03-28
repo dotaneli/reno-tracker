@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { useProject } from "@/hooks/useProject";
 import { useI18n, type TKey } from "@/lib/i18n";
-import { useApi, apiPost, apiPatch } from "@/hooks/useApi";
+import { useApi, apiPost, apiPatch, apiDelete } from "@/hooks/useApi";
 import { useTranslate } from "@/hooks/useTranslate";
 import { useFinancials } from "@/hooks/useFinancials";
 import { Card } from "@/components/Card";
@@ -11,7 +11,8 @@ import { NodeTree } from "@/components/NodeTree";
 import { InlineCreateSelect } from "@/components/InlineCreateSelect";
 import { RoomMultiSelect } from "@/components/RoomMultiSelect";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Plus, X, ChevronDown, Search, List, LayoutGrid, ArrowUpDown, Wallet } from "lucide-react";
+import { ItemMilestones } from "@/components/ItemMilestones";
+import { Plus, X, ChevronDown, Search, List, LayoutGrid, ArrowUpDown, Wallet, CheckCircle2, Pencil, Trash2 } from "lucide-react";
 import { mutate } from "swr";
 
 const input = "w-full rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] px-4 py-3 text-sm text-[var(--fg)] placeholder-[var(--fg-muted)]/60 outline-none transition-all focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/10";
@@ -341,7 +342,7 @@ export default function TasksPage() {
               {t("task.noMatch")}
             </div>
           ) : filteredNodes.map((node: any) => (
-            <TaskCard key={node.id} node={node} tr={tr} fmt={fmt} t={t} onEdit={() => startEdit(node)} />
+            <TaskCard key={node.id} node={node} tr={tr} fmt={fmt} t={t} onEdit={() => startEdit(node)} onMutate={mutateAll} projectId={project.id} />
           ))}
         </div>
       )}
@@ -349,106 +350,150 @@ export default function TasksPage() {
   );
 }
 
-// ── Task Card Component ──
+// ── Task Card Component (full functionality) ──
 
-function TaskCard({ node, tr, fmt, t, onEdit }: { node: any; tr: (s: string) => string; fmt: (n: number) => string; t: (key: TKey) => string; onEdit: () => void }) {
+function TaskCard({ node, tr, fmt, t, onEdit, onMutate, projectId }: {
+  node: any; tr: (s: string) => string; fmt: (n: number) => string;
+  t: (key: TKey) => string; onEdit: () => void; onMutate: () => void; projectId: string;
+}) {
   const { lang } = useI18n();
+  const [expanded, setExpanded] = useState(false);
   const cost = Number(node.expectedCost || 0);
   const paid = Number(node._paid || 0);
   const remaining = cost - paid;
   const pct = cost > 0 ? Math.round((paid / cost) * 100) : 0;
+  const isDone = node.status === "COMPLETED";
+
+  const handleMarkDone = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    await fetch(`/api/nodes/${node.id}/done`, { method: "POST" });
+    onMutate();
+  };
+
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm(t("task.deleteConfirm").replace("{name}", node.name))) return;
+    await apiDelete(`/api/nodes/${node.id}`);
+    onMutate();
+  };
 
   return (
-    <div
-      onClick={onEdit}
-      className="group relative cursor-pointer overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] p-4 shadow-sm transition-all duration-200 hover:scale-[1.02] hover:shadow-[0_8px_30px_rgba(26,23,20,0.08)] hover:border-[var(--accent)]/30"
-    >
+    <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] shadow-sm transition-all duration-200 hover:shadow-[0_8px_30px_rgba(26,23,20,0.08)] hover:border-[var(--accent)]/30">
       {/* Status accent line */}
-      <div className={`absolute inset-x-0 top-0 h-1 ${
+      <div className={`h-1 ${
         node.status === "COMPLETED" ? "bg-[var(--success)]" :
         node.status === "IN_PROGRESS" ? "bg-[var(--accent)]" :
         node.status === "CANCELLED" ? "bg-[var(--alert)]" :
         "bg-[var(--border)]"
       }`} />
 
-      {/* Header: name + status */}
-      <div className="mb-3 flex items-start justify-between gap-2">
-        <h3 className="text-sm font-bold text-[var(--fg)] leading-tight">{tr(node.name)}</h3>
-        <StatusBadge status={node.status} />
-      </div>
-
-      {/* Tags row: vendor + category */}
-      <div className="mb-3 flex flex-wrap gap-1.5">
-        {node.vendor?.name && (
-          <span className="rounded-lg bg-[var(--border-subtle)] px-2 py-0.5 text-[10px] font-medium text-[var(--fg-secondary)]">
-            {tr(node.vendor.name)}
-          </span>
-        )}
-        {node.category?.name && (
-          <span className="rounded-lg bg-[var(--accent-soft)] px-2 py-0.5 text-[10px] font-bold uppercase text-[var(--accent)]">
-            {tr(node.category.name)}
-          </span>
-        )}
-        {node._count?.children > 0 && (
-          <span className="rounded-lg bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-600">
-            {node._count.children} {t("task.subTasks")}
-          </span>
-        )}
-        {node.rooms?.map((r: any) => (
-          <span key={r.roomId} className="rounded-lg bg-[var(--border-subtle)] px-2 py-0.5 text-[10px] font-medium text-[var(--fg-muted)]">
-            {r.room?.name || ""}
-          </span>
-        ))}
-      </div>
-
-      {/* Expected date */}
-      {node.expectedDate && (
-        <p className="mb-2 text-[10px] text-[var(--fg-muted)]">
-          {new Date(node.expectedDate).toLocaleDateString(lang === "he" ? "he-IL" : "en-IL", { day: "numeric", month: "short", year: "numeric" })}
-        </p>
-      )}
-
-      {/* Cost section */}
-      {cost > 0 ? (
-        <div className="space-y-2">
-          {/* Progress bar */}
-          <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--border-subtle)]">
-            <div
-              className="h-full rounded-full transition-all duration-700 ease-out"
-              style={{
-                width: `${Math.min(pct, 100)}%`,
-                background: pct >= 100 ? "var(--success)" : "linear-gradient(90deg, var(--accent), #C9A87C)",
-              }}
-            />
-          </div>
-
-          {/* Cost numbers */}
-          <div className="flex items-center justify-between text-[11px]">
-            <div className="flex items-center gap-1">
-              <span className="font-bold text-[var(--success)]">{fmt(paid)}</span>
-              <span className="text-[var(--fg-muted)]">/</span>
-              <span className="font-semibold text-[var(--fg)]">{fmt(cost)}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              {pct > 0 && (
-                <span className="rounded-md bg-[var(--success-soft)] px-1.5 py-0.5 text-[9px] font-bold text-[var(--success)]">{pct}%</span>
-              )}
-              {remaining > 0 && (
-                <span className="font-semibold text-[var(--alert)]">{fmt(remaining)} {t("task.left")}</span>
-              )}
-            </div>
+      {/* Clickable header area */}
+      <div className="cursor-pointer p-4" onClick={() => setExpanded(!expanded)}>
+        {/* Header: name + status + actions */}
+        <div className="mb-2 flex items-start justify-between gap-2">
+          <h3 className={`text-sm font-bold leading-tight ${isDone ? "text-[var(--fg-muted)] line-through" : "text-[var(--fg)]"}`}>{tr(node.name)}</h3>
+          <div className="flex shrink-0 items-center gap-1">
+            <StatusBadge status={node.status} />
           </div>
         </div>
-      ) : (
-        <p className="text-xs italic text-[var(--fg-muted)]">{t("task.noCost")}</p>
-      )}
 
-      {/* Counts row */}
-      {(node._count?.milestones > 0 || node._count?.issues > 0 || node._count?.receipts > 0) && (
-        <div className="mt-3 flex gap-3 border-t border-[var(--border-subtle)] pt-2 text-[10px] text-[var(--fg-muted)]">
-          {node._count?.milestones > 0 && <span>{node._count.milestones} {t("task.milestones").toLowerCase()}</span>}
-          {node._count?.issues > 0 && <span className="text-[var(--alert)]">{node._count.issues} {t("nav.issues").toLowerCase()}</span>}
-          {node._count?.receipts > 0 && <span>{node._count.receipts} {t("task.receipts").toLowerCase()}</span>}
+        {/* Tags */}
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {node.vendor?.name && (
+            <span className="rounded-lg bg-[var(--border-subtle)] px-2 py-0.5 text-[10px] font-medium text-[var(--fg-secondary)]">{tr(node.vendor.name)}</span>
+          )}
+          {node.category?.name && (
+            <span className="rounded-lg bg-[var(--accent-soft)] px-2 py-0.5 text-[10px] font-bold uppercase text-[var(--accent)]">{tr(node.category.name)}</span>
+          )}
+          {node._count?.children > 0 && (
+            <span className="rounded-lg bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-600">{node._count.children} {t("task.subTasks")}</span>
+          )}
+          {node.rooms?.map((r: any) => (
+            <span key={r.roomId} className="rounded-lg bg-[var(--border-subtle)] px-2 py-0.5 text-[10px] font-medium text-[var(--fg-muted)]">{r.room?.name || ""}</span>
+          ))}
+        </div>
+
+        {/* Date */}
+        {node.expectedDate && (
+          <p className="mb-2 text-[10px] text-[var(--fg-muted)]">
+            {new Date(node.expectedDate).toLocaleDateString(lang === "he" ? "he-IL" : "en-IL", { day: "numeric", month: "short", year: "numeric" })}
+          </p>
+        )}
+
+        {/* Cost + progress */}
+        {cost > 0 ? (
+          <div className="space-y-1.5">
+            <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--border-subtle)]">
+              <div className="h-full rounded-full transition-all duration-700 ease-out"
+                style={{ width: `${Math.min(pct, 100)}%`, background: pct >= 100 ? "var(--success)" : "linear-gradient(90deg, var(--accent), #C9A87C)" }} />
+            </div>
+            <div className="flex items-center justify-between text-[11px]">
+              <div className="flex items-center gap-1">
+                <span className="font-bold text-[var(--success)]">{fmt(paid)}</span>
+                <span className="text-[var(--fg-muted)]">/</span>
+                <span className="font-semibold text-[var(--fg)]">{fmt(cost)}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {pct > 0 && <span className="rounded-md bg-[var(--success-soft)] px-1.5 py-0.5 text-[9px] font-bold text-[var(--success)]">{pct}%</span>}
+                {remaining > 0 && <span className="font-semibold text-[var(--alert)]">{fmt(remaining)} {t("task.left")}</span>}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <p className="text-xs italic text-[var(--fg-muted)]">{t("task.noCost")}</p>
+        )}
+
+        {/* Counts + expand hint */}
+        <div className="mt-2 flex items-center justify-between">
+          <div className="flex gap-3 text-[10px] text-[var(--fg-muted)]">
+            {node._count?.milestones > 0 && <span>{node._count.milestones} {t("task.milestones").toLowerCase()}</span>}
+            {node._count?.issues > 0 && <span className="text-[var(--alert)]">{node._count.issues} {t("nav.issues").toLowerCase()}</span>}
+            {node._count?.receipts > 0 && <span>{node._count.receipts} {t("task.receipts").toLowerCase()}</span>}
+          </div>
+          <ChevronDown size={14} className={`text-[var(--fg-muted)] transition-transform duration-200 ${expanded ? "rotate-180" : ""}`} />
+        </div>
+      </div>
+
+      {/* ── Expanded detail panel ── */}
+      {expanded && (
+        <div className="border-t border-[var(--border-subtle)] bg-[var(--bg)] px-4 pb-4">
+          {/* Action buttons */}
+          <div className="flex flex-wrap gap-2 py-3">
+            {!isDone && (
+              <button onClick={handleMarkDone} className="flex items-center gap-1.5 rounded-lg bg-[var(--success-soft)] px-3 py-2 text-xs font-semibold text-[var(--success)] transition-all hover:bg-[var(--success)] hover:text-white">
+                <CheckCircle2 size={14} /> {t("task.markDone")}
+              </button>
+            )}
+            <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="flex items-center gap-1.5 rounded-lg bg-[var(--fg)]/5 px-3 py-2 text-xs font-semibold text-[var(--fg)] transition-all hover:bg-[var(--accent)] hover:text-white">
+              <Pencil size={13} /> {t("crud.edit")}
+            </button>
+            <button onClick={handleDelete} className="flex items-center gap-1.5 rounded-lg bg-[var(--fg)]/5 px-3 py-2 text-xs font-semibold text-[var(--fg)] transition-all hover:bg-[var(--alert)] hover:text-white">
+              <Trash2 size={13} /> {t("crud.delete")}
+            </button>
+          </div>
+
+          {/* Payment milestones */}
+          {cost > 0 && (
+            <ItemMilestones itemId={node.id} expectedCost={cost} />
+          )}
+
+          {/* Children preview */}
+          {node._count?.children > 0 && node.children?.length > 0 && (
+            <div className="mt-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-3">
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-[var(--fg-muted)]">{t("task.subTasks")}</p>
+              <div className="space-y-1">
+                {node.children.map((child: any) => (
+                  <div key={child.id} className="flex items-center justify-between rounded-lg px-2 py-1.5 text-xs hover:bg-[var(--warm-glow)]">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-medium text-[var(--fg)]">{tr(child.name)}</span>
+                      <StatusBadge status={child.status} />
+                    </div>
+                    {child.expectedCost && <span className="font-semibold text-[var(--fg-muted)]">{fmt(Number(child.expectedCost))}</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
