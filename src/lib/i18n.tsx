@@ -33,6 +33,7 @@ const dict = {
   "admin.allUsers": { en: "All Users", he: "כל המשתמשים" },
   "admin.allProjects": { en: "All Projects", he: "כל הפרויקטים" },
   "admin.allTeams": { en: "All Teams", he: "כל הצוותים" },
+  "admin.systemOverview": { en: "System overview", he: "סקירת מערכת" },
   "admin.projects": { en: "projects", he: "פרויקטים" },
   "admin.members": { en: "members", he: "חברים" },
   "admin.nodes": { en: "nodes", he: "צמתים" },

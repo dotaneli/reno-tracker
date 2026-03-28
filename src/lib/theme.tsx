@@ -194,16 +194,19 @@ interface ThemeContextValue {
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [themeId, setThemeId] = useState("nordic-warm");
-
-  useEffect(() => {
+  const [themeId, setThemeId] = useState(() => {
+    if (typeof window === "undefined") return "nordic-warm";
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored && themes.some((t) => t.id === stored)) {
-      setThemeId(stored);
-      const theme = themes.find((t) => t.id === stored)!;
-      applyTheme(theme);
-    }
-  }, []);
+    return stored && themes.some((t) => t.id === stored) ? stored : "nordic-warm";
+  });
+
+  // Apply theme on mount (synchronous read above avoids FOUC for the state,
+  // but we still need to set CSS variables on the DOM)
+  useEffect(() => {
+    const theme = themes.find((t) => t.id === themeId);
+    if (theme && themeId !== "nordic-warm") applyTheme(theme);
+    else clearTheme();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setTheme = useCallback((id: string) => {
     const theme = themes.find((t) => t.id === id);

@@ -23,7 +23,8 @@ export async function GET() {
       },
     });
 
-    return json(user);
+    const adminEmail = process.env.ADMIN_EMAIL || "dotaneli@gmail.com";
+    return json({ ...user, isAdmin: user?.email === adminEmail });
   } catch (err) {
     return handleError(err);
   }

@@ -37,7 +37,7 @@ export function Nav() {
   const [loading, setLoading] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const { data: me } = useApi<any>("/api/me");
-  const isAdmin = me?.email === "dotaneli@gmail.com";
+  const isAdmin = me?.isAdmin === true;
   const links = isAdmin ? [...baseLinks, adminLink] : baseLinks;
 
   const projectId = activeProject?.id;

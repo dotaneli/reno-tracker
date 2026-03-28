@@ -20,15 +20,14 @@ interface AdminData {
 export default function AdminPage() {
   const { t } = useI18n();
   const { data: me } = useApi<any>("/api/me");
-  const { data, error, isLoading } = useApi<AdminData>(
-    me?.email === "dotaneli@gmail.com" ? "/api/admin" : null
-  );
+  // Fetch admin data — the API itself enforces the email check server-side
+  const { data, error, isLoading } = useApi<AdminData>(me ? "/api/admin" : null);
 
-  if (me && me.email !== "dotaneli@gmail.com") {
+  if (error) {
     return (
       <div className="mx-auto max-w-3xl py-12 text-center">
         <Shield size={48} className="mx-auto mb-4 text-[var(--fg-muted)]" />
-        <p className="text-lg font-semibold text-[var(--fg)]">403 — Forbidden</p>
+        <p className="text-lg font-semibold text-[var(--fg)]">403</p>
       </div>
     );
   }
@@ -37,14 +36,6 @@ export default function AdminPage() {
     return (
       <div className="mx-auto max-w-4xl py-12 text-center">
         <p className="text-sm text-[var(--fg-muted)]">{t("general.loading")}</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="mx-auto max-w-4xl py-12 text-center">
-        <p className="text-sm text-[var(--alert)]">{t("general.error")}</p>
       </div>
     );
   }
@@ -61,7 +52,7 @@ export default function AdminPage() {
         </div>
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-[var(--fg)]">{t("nav.admin")}</h1>
-          <p className="text-xs text-[var(--fg-muted)]">System overview</p>
+          <p className="text-xs text-[var(--fg-muted)]">{t("admin.systemOverview")}</p>
         </div>
       </div>
 

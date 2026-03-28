@@ -2,7 +2,7 @@ import { requireUser } from "@/lib/dal";
 import { json, handleError, errorResponse } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
 
-const ADMIN_EMAIL = "dotaneli@gmail.com";
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "dotaneli@gmail.com";
 
 // GET /api/admin — return all users, projects, and team memberships (admin only)
 export async function GET() {
