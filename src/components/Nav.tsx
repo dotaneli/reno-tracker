@@ -7,12 +7,13 @@ import { useI18n, type TKey } from "@/lib/i18n";
 import { useProject } from "@/hooks/useProject";
 import {
   LayoutDashboard, ListTodo, Users, AlertTriangle, Truck, Home,
-  Receipt, History, FolderKanban, Tags, Plug,
+  Receipt, History, FolderKanban, Tags, Plug, Settings, Shield,
   FileSpreadsheet, FileText, MessageCircle, Image, Download, Copy, Check,
   type LucideIcon,
 } from "lucide-react";
+import { useApi } from "@/hooks/useApi";
 
-const links: { href: string; label: TKey; icon: LucideIcon }[] = [
+const baseLinks: { href: string; label: TKey; icon: LucideIcon }[] = [
   { href: "/", label: "nav.dashboard", icon: LayoutDashboard },
   { href: "/projects", label: "nav.projects", icon: FolderKanban },
   { href: "/tasks", label: "nav.tasks", icon: ListTodo },
@@ -24,7 +25,10 @@ const links: { href: string; label: TKey; icon: LucideIcon }[] = [
   { href: "/history", label: "nav.history", icon: History },
   { href: "/team", label: "nav.team", icon: Users },
   { href: "/integrations", label: "nav.integrations", icon: Plug },
+  { href: "/settings", label: "nav.settings", icon: Settings },
 ];
+
+const adminLink = { href: "/admin", label: "nav.admin" as TKey, icon: Shield };
 
 export function Nav() {
   const pathname = usePathname();
@@ -32,6 +36,9 @@ export function Nav() {
   const { activeProject } = useProject();
   const [loading, setLoading] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  const { data: me } = useApi<any>("/api/me");
+  const isAdmin = me?.email === "dotaneli@gmail.com";
+  const links = isAdmin ? [...baseLinks, adminLink] : baseLinks;
 
   const projectId = activeProject?.id;
 

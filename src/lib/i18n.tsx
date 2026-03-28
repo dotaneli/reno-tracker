@@ -24,6 +24,18 @@ const dict = {
   "nav.issues": { en: "Issues", he: "תקלות" },
   "nav.projects": { en: "Projects", he: "פרויקטים" },
   "nav.signOut": { en: "Sign Out", he: "התנתק" },
+  "nav.admin": { en: "Admin", he: "ניהול" },
+
+  // ── Admin ──
+  "admin.totalUsers": { en: "Total Users", he: "סה״כ משתמשים" },
+  "admin.totalProjects": { en: "Total Projects", he: "סה״כ פרויקטים" },
+  "admin.totalNodes": { en: "Total Nodes", he: "סה״כ צמתים" },
+  "admin.allUsers": { en: "All Users", he: "כל המשתמשים" },
+  "admin.allProjects": { en: "All Projects", he: "כל הפרויקטים" },
+  "admin.allTeams": { en: "All Teams", he: "כל הצוותים" },
+  "admin.projects": { en: "projects", he: "פרויקטים" },
+  "admin.members": { en: "members", he: "חברים" },
+  "admin.nodes": { en: "nodes", he: "צמתים" },
 
   // ── Login ──
   "login.title": { en: "Reno Tracker", he: "מעקב שיפוצים" },
@@ -88,6 +100,10 @@ const dict = {
   "general.redo": { en: "Redo", he: "חזור" },
   "general.nothingToUndo": { en: "Nothing to undo", he: "אין מה לבטל" },
   "general.nothingToRedo": { en: "Nothing to redo", he: "אין מה לחזור" },
+  "general.undoHint": { en: "Undo (Ctrl+Z)", he: "בטל (Ctrl+Z)" },
+  "general.redoHint": { en: "Redo (Ctrl+Y)", he: "חזור (Ctrl+Y)" },
+  "general.undoHintMac": { en: "Undo (\u2318Z)", he: "בטל (\u2318Z)" },
+  "general.redoHintMac": { en: "Redo (\u2318\u21e7Z)", he: "חזור (\u2318\u21e7Z)" },
 
   // ── Team ──
   "team.title": { en: "Team Members", he: "חברי הצוות" },
@@ -288,6 +304,7 @@ const dict = {
 
   // ── Integrations ──
   "nav.integrations": { en: "Integrations", he: "אינטגרציות" },
+  "nav.settings": { en: "Settings", he: "הגדרות" },
   "integ.title": { en: "Connect Your AI Assistant", he: "חבר את עוזר ה-AI שלך" },
   "integ.subtitle": { en: "Let AI help manage your renovation project", he: "תן ל-AI לעזור בניהול פרויקט השיפוץ שלך" },
   "integ.setup": { en: "Set Up", he: "הגדר" },
@@ -321,6 +338,10 @@ const dict = {
   "general.error": { en: "Something went wrong", he: "משהו השתבש" },
   "general.noProject": { en: "No project found", he: "לא נמצא פרויקט" },
   "general.currency": { en: "ILS", he: "₪" },
+
+  // ── Settings ──
+  "settings.title": { en: "Settings", he: "הגדרות" },
+  "settings.themeDesc": { en: "Choose a color theme for the app", he: "בחר ערכת צבעים לאפליקציה" },
 } as const;
 
 export type TKey = keyof typeof dict;

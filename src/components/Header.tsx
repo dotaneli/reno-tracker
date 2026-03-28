@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useI18n } from "@/lib/i18n";
 import { useProject } from "@/hooks/useProject";
 import { LangToggle } from "./LangToggle";
@@ -14,26 +14,94 @@ interface HeaderProps {
 export function Header({ user }: HeaderProps) {
   const { t } = useI18n();
   const { activeProject } = useProject();
-  const [undoMsg, setUndoMsg] = useState("");
+  const [toast, setToast] = useState<{ text: string; type: "success" | "error" } | null>(null);
+  const [undoLoading, setUndoLoading] = useState(false);
+  const [redoLoading, setRedoLoading] = useState(false);
+  const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  const handleUndo = async () => {
-    if (!activeProject) return;
-    const res = await fetch(`/api/projects/${activeProject.id}/undo`, { method: "POST" });
-    const data = await res.json();
-    setUndoMsg(data.description || "");
-    setTimeout(() => setUndoMsg(""), 2000);
-    // Refresh all data
-    mutate(() => true, undefined, { revalidate: true });
-  };
+  const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.userAgent);
 
-  const handleRedo = async () => {
-    if (!activeProject) return;
-    const res = await fetch(`/api/projects/${activeProject.id}/redo`, { method: "POST" });
-    const data = await res.json();
-    setUndoMsg(data.description || "");
-    setTimeout(() => setUndoMsg(""), 2000);
-    mutate(() => true, undefined, { revalidate: true });
-  };
+  const showToast = useCallback((text: string, type: "success" | "error") => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast({ text, type });
+    toastTimer.current = setTimeout(() => setToast(null), 2200);
+  }, []);
+
+  const handleUndo = useCallback(async () => {
+    if (!activeProject || undoLoading) return;
+    setUndoLoading(true);
+    try {
+      const res = await fetch(`/api/projects/${activeProject.id}/undo`, { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        showToast(data.description || t("general.undo"), "success");
+        mutate(() => true, undefined, { revalidate: true });
+      } else {
+        showToast(data.description || t("general.nothingToUndo"), "error");
+      }
+    } catch {
+      showToast(t("general.error"), "error");
+    } finally {
+      setUndoLoading(false);
+    }
+  }, [activeProject, undoLoading, showToast, t]);
+
+  const handleRedo = useCallback(async () => {
+    if (!activeProject || redoLoading) return;
+    setRedoLoading(true);
+    try {
+      const res = await fetch(`/api/projects/${activeProject.id}/redo`, { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        showToast(data.description || t("general.redo"), "success");
+        mutate(() => true, undefined, { revalidate: true });
+      } else {
+        showToast(data.description || t("general.nothingToRedo"), "error");
+      }
+    } catch {
+      showToast(t("general.error"), "error");
+    } finally {
+      setRedoLoading(false);
+    }
+  }, [activeProject, redoLoading, showToast, t]);
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // Skip if user is typing in an input, textarea, select, or contentEditable
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if ((e.target as HTMLElement)?.isContentEditable) return;
+
+      const mod = isMac ? e.metaKey : e.ctrlKey;
+      if (!mod) return;
+
+      // Undo: Ctrl+Z / Cmd+Z (without Shift)
+      if (e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+        return;
+      }
+
+      // Redo: Ctrl+Y / Cmd+Shift+Z
+      if (e.key === "y" && !isMac) {
+        e.preventDefault();
+        handleRedo();
+        return;
+      }
+      if (e.key === "z" && e.shiftKey && isMac) {
+        e.preventDefault();
+        handleRedo();
+        return;
+      }
+    };
+
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [handleUndo, handleRedo, isMac]);
+
+  const undoTitle = isMac ? t("general.undoHintMac") : t("general.undoHint");
+  const redoTitle = isMac ? t("general.redoHintMac") : t("general.redoHint");
 
   return (
     <header className="sticky top-0 z-30 border-b border-[var(--border-subtle)] bg-[var(--bg-elevated)]/80 backdrop-blur-xl">
@@ -48,22 +116,38 @@ export function Header({ user }: HeaderProps) {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Undo / Redo */}
+          {/* Undo / Redo — fixed order, always LTR so they don't flip with RTL */}
           {activeProject && (
-            <div className="flex items-center gap-1">
-              <button onClick={handleUndo} className="rounded-lg p-2 text-[var(--fg-muted)] transition-all hover:bg-[var(--border-subtle)] hover:text-[var(--fg)]" title={t("general.undo")}>
+            <div className="flex items-center gap-1" dir="ltr">
+              <button
+                onClick={handleUndo}
+                disabled={undoLoading}
+                className="rounded-lg p-2 transition-all disabled:opacity-30 disabled:cursor-not-allowed text-[var(--fg-muted)] hover:bg-[var(--border-subtle)] hover:text-[var(--fg)] disabled:hover:bg-transparent disabled:hover:text-[var(--fg-muted)]"
+                title={undoTitle}
+              >
                 <Undo2 size={16} />
               </button>
-              <button onClick={handleRedo} className="rounded-lg p-2 text-[var(--fg-muted)] transition-all hover:bg-[var(--border-subtle)] hover:text-[var(--fg)]" title={t("general.redo")}>
+              <button
+                onClick={handleRedo}
+                disabled={redoLoading}
+                className="rounded-lg p-2 transition-all disabled:opacity-30 disabled:cursor-not-allowed text-[var(--fg-muted)] hover:bg-[var(--border-subtle)] hover:text-[var(--fg)] disabled:hover:bg-transparent disabled:hover:text-[var(--fg-muted)]"
+                title={redoTitle}
+              >
                 <Redo2 size={16} />
               </button>
             </div>
           )}
 
-          {/* Undo/Redo feedback toast */}
-          {undoMsg && (
-            <span className="rounded-lg bg-[var(--fg)] px-3 py-1.5 text-[11px] font-medium text-[var(--bg-elevated)] animate-[fadeIn_0.2s]">
-              {undoMsg}
+          {/* Toast notification */}
+          {toast && (
+            <span
+              className={`rounded-lg px-3 py-1.5 text-[11px] font-medium animate-[fadeIn_0.2s] ${
+                toast.type === "success"
+                  ? "bg-[var(--fg)] text-[var(--bg-elevated)]"
+                  : "bg-red-600 text-white"
+              }`}
+            >
+              {toast.text}
             </span>
           )}
 
