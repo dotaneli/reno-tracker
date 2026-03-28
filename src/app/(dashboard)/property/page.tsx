@@ -139,22 +139,6 @@ export default function PropertyPage() {
         </Card>
       )}
 
-      {editRoom && (
-        <Card glow>
-          <form onSubmit={updateRoom} className="flex gap-3">
-            <input type="text" value={editRoom.name} onChange={(e) => setEditRoom({ ...editRoom, name: e.target.value })} required className={`${input} flex-1`} />
-            <div className="relative">
-              <select value={editRoom.type} onChange={(e) => setEditRoom({ ...editRoom, type: e.target.value })} className={select}>
-                {roomTypes.map((rt) => <option key={rt} value={rt}>{t(`roomType.${rt}` as TKey)}</option>)}
-              </select>
-              <ChevronDown size={14} className="pointer-events-none absolute end-3.5 top-1/2 -translate-y-1/2 text-[var(--fg-muted)]" />
-            </div>
-            <button type="submit" className="shrink-0 rounded-xl bg-[var(--accent)] px-6 py-3 text-sm font-semibold text-white">{t("task.save")}</button>
-            <button type="button" onClick={() => setEditRoom(null)} className="shrink-0 rounded-xl bg-[var(--border-subtle)] px-4 py-3 text-sm text-[var(--fg-secondary)]">{t("task.cancel")}</button>
-          </form>
-        </Card>
-      )}
-
       {!floors ? (
         <p className="py-16 text-center text-sm text-[var(--fg-muted)]">{t("general.loading")}</p>
       ) : floors.length === 0 ? (
@@ -200,37 +184,59 @@ export default function PropertyPage() {
                     const roomTasks = getRoomTasks(room.id);
                     return (
                       <Card key={room.id} className="!p-3">
-                        <Expandable trigger={
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2">
-                                <DoorOpen size={14} className="shrink-0 text-[var(--accent)]" />
-                                <p className="truncate text-sm font-semibold text-[var(--fg)]">{tr(room.name)}</p>
-                                <span className="rounded bg-[var(--border-subtle)] px-1.5 py-0.5 text-[9px] font-medium text-[var(--fg-muted)]">{t(`roomType.${room.type}` as TKey)}</span>
+                        {editRoom?.id === room.id ? (
+                          /* ── Inline edit ── */
+                          <form onSubmit={updateRoom} className="space-y-2">
+                            <div className="flex items-center gap-2 mb-1">
+                              <DoorOpen size={14} className="text-[var(--accent)]" />
+                              <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent)]">{t("crud.edit")}</p>
+                            </div>
+                            <input type="text" value={editRoom!.name} onChange={(e) => setEditRoom({ id: editRoom!.id, name: e.target.value, type: editRoom!.type })} required className={input} autoFocus />
+                            <div className="flex gap-2">
+                              <div className="relative flex-1">
+                                <select value={editRoom!.type} onChange={(e) => setEditRoom({ id: editRoom!.id, name: editRoom!.name, type: e.target.value })} className={select}>
+                                  {roomTypes.map((rt) => <option key={rt} value={rt}>{t(`roomType.${rt}` as TKey)}</option>)}
+                                </select>
+                                <ChevronDown size={14} className="pointer-events-none absolute end-3.5 top-1/2 -translate-y-1/2 text-[var(--fg-muted)]" />
                               </div>
-                              <p className="mt-0.5 ms-5 text-[11px] text-[var(--fg-muted)]">
-                                {roomStats.count} {t("dash.tasks").toLowerCase()}
-                                {roomStats.cost > 0 && <> · <span className="text-[var(--success)]">{fmt(roomStats.paid)}</span> / {fmt(roomStats.cost)}</>}
-                                {roomStats.remaining > 0 && <> · <span className="text-[var(--alert)]">{fmt(roomStats.remaining)} {t("task.left")}</span></>}
-                              </p>
-                              {roomStats.cost > 0 && (
-                                <div className="mt-1.5 ms-5 h-1 w-full overflow-hidden rounded-full bg-[var(--border-subtle)]">
-                                  <div className="h-full rounded-full bg-[var(--success)]" style={{ width: `${Math.min(roomStats.pct, 100)}%` }} />
+                              <button type="submit" className="shrink-0 rounded-xl bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-white">{t("task.save")}</button>
+                              <button type="button" onClick={() => setEditRoom(null)} className="shrink-0 rounded-xl bg-[var(--border-subtle)] px-4 py-2.5 text-sm text-[var(--fg-secondary)]">{t("task.cancel")}</button>
+                            </div>
+                          </form>
+                        ) : (
+                          /* ── Normal display ── */
+                          <Expandable trigger={
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <DoorOpen size={14} className="shrink-0 text-[var(--accent)]" />
+                                  <p className="truncate text-sm font-semibold text-[var(--fg)]">{tr(room.name)}</p>
+                                  <span className="rounded bg-[var(--border-subtle)] px-1.5 py-0.5 text-[9px] font-medium text-[var(--fg-muted)]">{t(`roomType.${room.type}` as TKey)}</span>
                                 </div>
-                              )}
+                                <p className="mt-0.5 ms-5 text-[11px] text-[var(--fg-muted)]">
+                                  {roomStats.count} {t("dash.tasks").toLowerCase()}
+                                  {roomStats.cost > 0 && <> · <span className="text-[var(--success)]">{fmt(roomStats.paid)}</span> / {fmt(roomStats.cost)}</>}
+                                  {roomStats.remaining > 0 && <> · <span className="text-[var(--alert)]">{fmt(roomStats.remaining)} {t("task.left")}</span></>}
+                                </p>
+                                {roomStats.cost > 0 && (
+                                  <div className="mt-1.5 ms-5 h-1 w-full overflow-hidden rounded-full bg-[var(--border-subtle)]">
+                                    <div className="h-full rounded-full bg-[var(--success)]" style={{ width: `${Math.min(roomStats.pct, 100)}%` }} />
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex shrink-0 items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+                                <button onClick={() => setEditRoom({ id: room.id, name: room.name, type: room.type })} className="rounded-lg p-1.5 text-[var(--fg-muted)]/30 hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]"><Pencil size={12} /></button>
+                                <button onClick={() => deleteRoom(room)} className="rounded-lg p-1.5 text-[var(--fg-muted)]/30 hover:bg-[var(--alert-soft)] hover:text-[var(--alert)]"><Trash2 size={12} /></button>
+                              </div>
                             </div>
-                            <div className="flex shrink-0 items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
-                              <button onClick={() => setEditRoom({ id: room.id, name: room.name, type: room.type })} className="rounded-lg p-1.5 text-[var(--fg-muted)]/30 hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]"><Pencil size={12} /></button>
-                              <button onClick={() => deleteRoom(room)} className="rounded-lg p-1.5 text-[var(--fg-muted)]/30 hover:bg-[var(--alert-soft)] hover:text-[var(--alert)]"><Trash2 size={12} /></button>
-                            </div>
-                          </div>
-                        }>
-                          {roomTasks.length > 0 ? (
-                            <div className="rounded-lg bg-[var(--bg)] p-2 space-y-0.5">
-                              {roomTasks.map((n: any) => <TaskLine key={n.id} node={n} tr={tr} compact />)}
-                            </div>
-                          ) : <p className="text-xs text-[var(--fg-muted)] py-1">—</p>}
-                        </Expandable>
+                          }>
+                            {roomTasks.length > 0 ? (
+                              <div className="rounded-lg bg-[var(--bg)] p-2 space-y-0.5">
+                                {roomTasks.map((n: any) => <TaskLine key={n.id} node={n} tr={tr} compact />)}
+                              </div>
+                            ) : <p className="text-xs text-[var(--fg-muted)] py-1">—</p>}
+                          </Expandable>
+                        )}
                       </Card>
                     );
                   })}

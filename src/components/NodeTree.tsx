@@ -11,6 +11,7 @@ import {
   DragOverlay, type DragEndEvent, type DragStartEvent,
 } from "@dnd-kit/core";
 import { useDraggable } from "@dnd-kit/core";
+import { InlineNodeEdit } from "./InlineNodeEdit";
 import { ChevronRight, DollarSign, Calendar, Pencil, Trash2, Plus, GripVertical, CornerLeftUp, CheckCircle2 } from "lucide-react";
 
 const inp = "w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)] placeholder-[var(--fg-muted)]/60 outline-none focus:border-[var(--accent)]";
@@ -21,14 +22,19 @@ interface NodeTreeProps {
   projectId: string;
   vendors: any[];
   categories: any[];
+  floors?: any[];
+  allNodes?: any[];
+  editNodeId?: string | null;
   onMutate: () => void;
   onEdit: (node: any) => void;
+  onEditDone?: () => void;
+  onEditCancel?: () => void;
   tr: (text: string) => string;
   parentVendor?: string | null;
   parentCost?: number | null;
 }
 
-export function NodeTree({ nodes, depth = 0, projectId, vendors, categories, onMutate, onEdit, tr, parentVendor, parentCost }: NodeTreeProps) {
+export function NodeTree({ nodes, depth = 0, projectId, vendors, categories, floors, allNodes, editNodeId, onMutate, onEdit, onEditDone, onEditCancel, tr, parentVendor, parentCost }: NodeTreeProps) {
   const { t, lang } = useI18n();
   const [activeId, setActiveId] = useState<string | null>(null);
 
@@ -65,7 +71,7 @@ export function NodeTree({ nodes, depth = 0, projectId, vendors, categories, onM
         <RootDropZone active={!!activeId} label={t("task.moveToRoot")} />
         <div className="space-y-2">
           {nodes.map((node) => (
-            <DraggableNode key={node.id} node={node} depth={0} projectId={projectId} vendors={vendors} categories={categories} onMutate={onMutate} onEdit={onEdit} tr={tr} fmt={fmt} parentVendor={parentVendor} parentCost={parentCost} />
+            <DraggableNode key={node.id} node={node} depth={0} projectId={projectId} vendors={vendors} categories={categories} floors={floors} allNodes={allNodes} editNodeId={editNodeId} onMutate={onMutate} onEdit={onEdit} onEditDone={onEditDone} onEditCancel={onEditCancel} tr={tr} fmt={fmt} parentVendor={parentVendor} parentCost={parentCost} />
           ))}
         </div>
         <DragOverlay>
@@ -82,7 +88,7 @@ export function NodeTree({ nodes, depth = 0, projectId, vendors, categories, onM
   return (
     <div className="ms-3 md:ms-5 border-s border-[var(--border-subtle)] ps-2 md:ps-3 mt-1 space-y-2">
       {nodes.map((node) => (
-        <DraggableNode key={node.id} node={node} depth={depth} projectId={projectId} vendors={vendors} categories={categories} onMutate={onMutate} onEdit={onEdit} tr={tr} fmt={fmt} parentVendor={parentVendor} parentCost={parentCost} />
+        <DraggableNode key={node.id} node={node} depth={depth} projectId={projectId} vendors={vendors} categories={categories} floors={floors} allNodes={allNodes} editNodeId={editNodeId} onMutate={onMutate} onEdit={onEdit} onEditDone={onEditDone} onEditCancel={onEditCancel} tr={tr} fmt={fmt} parentVendor={parentVendor} parentCost={parentCost} />
       ))}
     </div>
   );
@@ -108,7 +114,7 @@ function DraggableNode(props: Omit<NodeTreeProps, "nodes"> & { node: any; fmt: (
   );
 }
 
-function NodeRow({ node, depth = 0, projectId, vendors, categories, onMutate, onEdit, tr, fmt, parentVendor, parentCost, dragListeners, isOver }: Omit<NodeTreeProps, "nodes"> & { node: any; fmt: (n: number | null) => string; dragListeners?: any; isOver?: boolean }) {
+function NodeRow({ node, depth = 0, projectId, vendors, categories, floors, allNodes, editNodeId, onMutate, onEdit, onEditDone, onEditCancel, tr, fmt, parentVendor, parentCost, dragListeners, isOver }: Omit<NodeTreeProps, "nodes"> & { node: any; fmt: (n: number | null) => string; dragListeners?: any; isOver?: boolean }) {
   const { t, lang } = useI18n();
   const [expanded, setExpanded] = useState(true);
   const [showMilestones, setShowMilestones] = useState(false);
@@ -220,6 +226,13 @@ function NodeRow({ node, depth = 0, projectId, vendors, categories, onMutate, on
         </div>
       </div>
 
+      {/* Inline edit */}
+      {editNodeId === node.id && onEditDone && onEditCancel && (
+        <div className="ms-3 md:ms-7 mt-1 rounded-xl border border-[var(--accent)]/30 bg-[var(--bg-elevated)] p-3 shadow-md">
+          <InlineNodeEdit node={node} projectId={projectId} allNodes={allNodes || []} vendors={vendors} categories={categories} floors={floors} tr={tr} onDone={onEditDone} onCancel={onEditCancel} />
+        </div>
+      )}
+
       {/* Milestones */}
       {showMilestones && hasCost && (
         <div className="ms-3 md:ms-7 mt-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-3">
@@ -251,7 +264,7 @@ function NodeRow({ node, depth = 0, projectId, vendors, categories, onMutate, on
 
       {/* Children */}
       {expanded && hasChildren && (
-        <NodeTree nodes={children} depth={(depth ?? 0) + 1} projectId={projectId} vendors={vendors} categories={categories} onMutate={onMutate} onEdit={onEdit} tr={tr} parentVendor={inheritedVendor} parentCost={hasCost ? ownCost : parentCost} />
+        <NodeTree nodes={children} depth={(depth ?? 0) + 1} projectId={projectId} vendors={vendors} categories={categories} floors={floors} allNodes={allNodes} editNodeId={editNodeId} onMutate={onMutate} onEdit={onEdit} onEditDone={onEditDone} onEditCancel={onEditCancel} tr={tr} parentVendor={inheritedVendor} parentCost={hasCost ? ownCost : parentCost} />
       )}
     </div>
   );
