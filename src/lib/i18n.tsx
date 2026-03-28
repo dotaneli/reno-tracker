@@ -265,8 +265,8 @@ const dict = {
   "crud.saving": { en: "Saving...", he: "שומר..." },
 
   // ── Item detail ──
-  "item.addMilestone": { en: "Add Milestone", he: "הוסף אבן דרך" },
-  "item.milestoneLabel": { en: "Milestone label", he: "שם אבן הדרך" },
+  "item.addMilestone": { en: "Add Payment", he: "הוסף תשלום" },
+  "item.milestoneLabel": { en: "Payment label", he: "שם התשלום" },
   "item.amount": { en: "Amount", he: "סכום" },
   "item.dueDate": { en: "Due date", he: "תאריך יעד" },
   "item.addNote": { en: "Add Note", he: "הוסף הערה" },
