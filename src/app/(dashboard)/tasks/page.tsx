@@ -5,43 +5,106 @@ import { useProject } from "@/hooks/useProject";
 import { useI18n, type TKey } from "@/lib/i18n";
 import { useApi, apiPost, apiPatch } from "@/hooks/useApi";
 import { useTranslate } from "@/hooks/useTranslate";
+import { useFinancials } from "@/hooks/useFinancials";
 import { Card } from "@/components/Card";
 import { NodeTree } from "@/components/NodeTree";
 import { InlineCreateSelect } from "@/components/InlineCreateSelect";
-import { Plus, X, ChevronDown } from "lucide-react";
+import { StatusBadge } from "@/components/StatusBadge";
+import { Plus, X, ChevronDown, Search, List, LayoutGrid, ArrowUpDown, Wallet } from "lucide-react";
 import { mutate } from "swr";
 
 const input = "w-full rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] px-4 py-3 text-sm text-[var(--fg)] placeholder-[var(--fg-muted)]/60 outline-none transition-all focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/10";
 const sel = "w-full appearance-none rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] px-4 py-3 pe-9 text-sm text-[var(--fg)] outline-none transition-all focus:border-[var(--accent)]";
 
-const nodeTypes = ["PLUMBING","ELECTRICAL","CARPENTRY","PAINTING","FLOORING","SMART_HOME","AUDIO_VISUAL","HVAC","WINDOWS_DOORS","KITCHEN","BATHROOM","GENERAL"] as const;
 const statuses = ["NOT_STARTED","IN_PROGRESS","COMPLETED","ON_HOLD","PENDING","ORDERED","DELIVERED","INSTALLED","CANCELLED"] as const;
 
-export default function InventoryPage() {
-  const { t } = useI18n();
+type SortKey = "default" | "price" | "category" | "vendor" | "status" | "payment";
+type ViewMode = "list" | "cards";
+
+export default function TasksPage() {
+  const { t, lang } = useI18n();
   const [showAddForm, setShowAddForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
   const [editNodeId, setEditNodeId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("default");
 
   const { activeProject: project } = useProject();
   const { data: tree } = useApi<any[]>(project ? `/api/nodes?projectId=${project.id}&tree=true` : null);
   const { data: allNodesFlat } = useApi<any[]>(project ? `/api/nodes?projectId=${project.id}` : null);
   const { data: vendors } = useApi<any[]>(project ? `/api/vendors?projectId=${project.id}` : null);
   const { data: categories } = useApi<any[]>(project ? `/api/categories?projectId=${project.id}` : null);
+  const fin = useFinancials(project?.id);
 
   const allTexts = useMemo(() => [
     ...(allNodesFlat?.map((n: any) => n.name) || []),
     ...(vendors?.map((v: any) => v.name) || []),
     ...(categories?.map((c: any) => c.name) || []),
-  ], [allNodesFlat, vendors]);
+  ], [allNodesFlat, vendors, categories]);
   const tr = useTranslate(allTexts);
 
   const mutateAll = () => { mutate(`/api/nodes?projectId=${project?.id}&tree=true`); mutate(`/api/nodes?projectId=${project?.id}`); mutate(`/api/vendors?projectId=${project?.id}`); mutate(`/api/categories?projectId=${project?.id}`); };
 
+  const fmt = (n: number) => new Intl.NumberFormat(lang === "he" ? "he-IL" : "en-IL", { style: "currency", currency: "ILS", maximumFractionDigits: 0 }).format(n);
+
+  // ── Search & Sort (for card view — operates on flat list) ──
+  const filteredNodes = useMemo(() => {
+    let nodes = allNodesFlat || [];
+    // Search
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      nodes = nodes.filter((n: any) =>
+        n.name?.toLowerCase().includes(q) ||
+        n.vendor?.name?.toLowerCase().includes(q) ||
+        n.category?.name?.toLowerCase().includes(q) ||
+        tr(n.name)?.toLowerCase().includes(q)
+      );
+    }
+    // Sort
+    if (sortKey !== "default") {
+      nodes = [...nodes].sort((a: any, b: any) => {
+        switch (sortKey) {
+          case "price": return (Number(b.expectedCost) || 0) - (Number(a.expectedCost) || 0);
+          case "category": return (a.category?.name || "zzz").localeCompare(b.category?.name || "zzz");
+          case "vendor": return (a.vendor?.name || "zzz").localeCompare(b.vendor?.name || "zzz");
+          case "status": return (a.status || "").localeCompare(b.status || "");
+          case "payment": {
+            const pctA = Number(a.expectedCost) > 0 ? (Number(a._paid || 0) / Number(a.expectedCost)) : 0;
+            const pctB = Number(b.expectedCost) > 0 ? (Number(b._paid || 0) / Number(b.expectedCost)) : 0;
+            return pctB - pctA;
+          }
+          default: return 0;
+        }
+      });
+    }
+    return nodes;
+  }, [allNodesFlat, searchQuery, sortKey, tr]);
+
+  // Filter tree for search (in list view)
+  const filteredTree = useMemo(() => {
+    if (!tree || !searchQuery.trim()) return tree;
+    const q = searchQuery.toLowerCase();
+    function matchesSearch(node: any): boolean {
+      if (node.name?.toLowerCase().includes(q) || tr(node.name)?.toLowerCase().includes(q) ||
+          node.vendor?.name?.toLowerCase().includes(q) || node.category?.name?.toLowerCase().includes(q))
+        return true;
+      return node.children?.some((c: any) => matchesSearch(c)) || false;
+    }
+    function filterNode(node: any): any | null {
+      if (matchesSearch(node)) {
+        return { ...node, children: node.children?.map(filterNode).filter(Boolean) || [] };
+      }
+      return null;
+    }
+    return tree.map(filterNode).filter(Boolean);
+  }, [tree, searchQuery, tr]);
+
   const rootCount = tree?.length || 0;
   const totalCount = allNodesFlat?.length || 0;
 
+  // ── Forms ──
   const [addForm, setAddForm] = useState({ name: "", categoryId: "", vendorId: "", expectedCost: "", expectedDate: "" });
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault(); setError("");
@@ -72,8 +135,9 @@ export default function InventoryPage() {
   };
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <div className="flex items-end justify-between">
+    <div className="mx-auto max-w-5xl space-y-5">
+      {/* Header */}
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-[var(--fg)]">{t("task.title")}</h1>
           <p className="mt-0.5 text-sm text-[var(--fg-muted)]">{rootCount} {t("dash.groups").toLowerCase()} · {totalCount} {t("dash.tasks").toLowerCase()}</p>
@@ -85,11 +149,96 @@ export default function InventoryPage() {
         </button>
       </div>
 
+      {/* Budget Bar */}
+      {!fin.loading && (
+        <div className="flex flex-wrap items-center gap-4 rounded-2xl bg-[var(--fg)] px-4 py-3 md:px-6 md:py-4 text-[var(--bg-elevated)]">
+          <div className="flex items-center gap-2">
+            <Wallet size={16} className="text-[var(--accent)]" />
+            <span className="text-xs font-medium opacity-70">{t("dash.budget")}</span>
+            <span className="text-sm font-bold">{fmt(fin.totalBudget)}</span>
+          </div>
+          <div className="h-4 w-px bg-white/20 hidden sm:block" />
+          <div className="flex items-center gap-1.5 text-xs">
+            <span className="opacity-70">{t("costs.totalCost")}</span>
+            <span className="font-bold">{fmt(fin.totalCost)}</span>
+          </div>
+          <div className="h-4 w-px bg-white/20 hidden sm:block" />
+          <div className="flex items-center gap-1.5 text-xs">
+            <span className="opacity-70">{t("costs.totalPaid")}</span>
+            <span className="font-bold text-[#78B080]">{fmt(fin.totalPaid)}</span>
+          </div>
+          <div className="h-4 w-px bg-white/20 hidden sm:block" />
+          <div className="flex items-center gap-1.5 text-xs">
+            <span className="opacity-70">{t("costs.totalRemaining")}</span>
+            <span className="font-bold text-amber-300">{fmt(fin.remainingPayments)}</span>
+          </div>
+          <div className="ms-auto flex items-center gap-1.5 text-xs">
+            <span className="opacity-70">{t("task.budgetRemaining")}</span>
+            <span className={`font-bold ${fin.budgetRemaining >= 0 ? "text-[#78B080]" : "text-red-400"}`}>{fmt(fin.budgetRemaining)}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Search + Sort + View Toggle */}
+      <div className="flex flex-wrap items-center gap-3">
+        {/* Search */}
+        <div className="relative flex-1 min-w-[200px]">
+          <Search size={16} className="pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 text-[var(--fg-muted)]" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={t("task.search")}
+            className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] py-2.5 pe-4 ps-10 text-sm text-[var(--fg)] placeholder-[var(--fg-muted)]/60 outline-none transition-all focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/10"
+          />
+          {searchQuery && (
+            <button onClick={() => setSearchQuery("")} className="absolute end-3 top-1/2 -translate-y-1/2 text-[var(--fg-muted)] hover:text-[var(--fg)]">
+              <X size={14} />
+            </button>
+          )}
+        </div>
+
+        {/* Sort */}
+        <div className="relative">
+          <ArrowUpDown size={14} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-[var(--fg-muted)]" />
+          <select
+            value={sortKey}
+            onChange={(e) => setSortKey(e.target.value as SortKey)}
+            className="appearance-none rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] py-2.5 pe-8 ps-9 text-xs font-medium text-[var(--fg)] outline-none transition-all focus:border-[var(--accent)]"
+          >
+            <option value="default">{t("task.sortDefault")}</option>
+            <option value="price">{t("task.sortPrice")}</option>
+            <option value="category">{t("task.sortCategory")}</option>
+            <option value="vendor">{t("task.sortVendor")}</option>
+            <option value="status">{t("task.sortStatus")}</option>
+            <option value="payment">{t("task.sortPayment")}</option>
+          </select>
+          <ChevronDown size={12} className="pointer-events-none absolute end-2.5 top-1/2 -translate-y-1/2 text-[var(--fg-muted)]" />
+        </div>
+
+        {/* View Toggle */}
+        <div className="flex rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] p-0.5">
+          <button
+            onClick={() => setViewMode("list")}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${viewMode === "list" ? "bg-[var(--fg)] text-[var(--bg-elevated)] shadow-sm" : "text-[var(--fg-muted)] hover:text-[var(--fg)]"}`}
+          >
+            <List size={14} /> {t("task.viewList")}
+          </button>
+          <button
+            onClick={() => setViewMode("cards")}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${viewMode === "cards" ? "bg-[var(--fg)] text-[var(--bg-elevated)] shadow-sm" : "text-[var(--fg-muted)] hover:text-[var(--fg)]"}`}
+          >
+            <LayoutGrid size={14} /> {t("task.viewCards")}
+          </button>
+        </div>
+      </div>
+
+      {/* Add Form */}
       {showAddForm && (
         <Card glow>
           <form onSubmit={handleAdd} className="space-y-3">
             <input type="text" placeholder={t("task.name")} value={addForm.name} onChange={(e) => setAddForm({ ...addForm, name: e.target.value })} required className={input} />
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <InlineCreateSelect
                 value={addForm.categoryId} onChange={(c) => setAddForm({ ...addForm, categoryId: c })}
                 options={(categories || []).map((c: any) => ({ id: c.id, name: c.name }))}
@@ -110,12 +259,13 @@ export default function InventoryPage() {
         </Card>
       )}
 
+      {/* Edit Form */}
       {showEditForm && editNodeId && (
         <Card glow>
           <p className="mb-3 text-xs font-semibold text-[var(--fg-muted)]">{t("crud.edit")}</p>
           <form onSubmit={handleEdit} className="space-y-3">
             <input type="text" placeholder={t("task.name")} value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} required className={input} />
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="relative">
                 <select value={editForm.parentId} onChange={(e) => setEditForm({ ...editForm, parentId: e.target.value })} className={sel}>
                   <option value="">{t("task.selectParent")}</option>
@@ -136,7 +286,7 @@ export default function InventoryPage() {
                 onCreate={async (name) => { const res = await apiPost("/api/vendors", { name, projectId: project.id }); mutateAll(); return res.id; }}
               />
             </div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <input type="number" placeholder={t("task.expected")} value={editForm.expectedCost} onChange={(e) => setEditForm({ ...editForm, expectedCost: e.target.value })} className={input} />
               <input type="date" value={editForm.expectedDate} onChange={(e) => setEditForm({ ...editForm, expectedDate: e.target.value })} className={input} />
               <div className="relative">
@@ -155,12 +305,119 @@ export default function InventoryPage() {
         </Card>
       )}
 
+      {/* Content */}
       {!tree ? (
         <p className="py-16 text-center text-sm text-[var(--fg-muted)]">{t("general.loading")}</p>
       ) : tree.length === 0 ? (
         <Card><p className="py-12 text-center text-sm text-[var(--fg-muted)]">{t("task.noTasks")}</p></Card>
+      ) : viewMode === "list" ? (
+        /* ── List View (Tree) ── */
+        <NodeTree nodes={filteredTree || tree} projectId={project.id} vendors={vendors || []} categories={categories || []} onMutate={mutateAll} onEdit={startEdit} tr={tr} />
       ) : (
-        <NodeTree nodes={tree} projectId={project.id} vendors={vendors || []} categories={categories || []} onMutate={mutateAll} onEdit={startEdit} tr={tr} />
+        /* ── Card Gallery View ── */
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {filteredNodes.length === 0 ? (
+            <div className="col-span-full py-12 text-center text-sm text-[var(--fg-muted)]">
+              {searchQuery ? `No tasks matching "${searchQuery}"` : t("task.noTasks")}
+            </div>
+          ) : filteredNodes.map((node: any) => (
+            <TaskCard key={node.id} node={node} tr={tr} fmt={fmt} t={t} onEdit={() => startEdit(node)} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Task Card Component ──
+
+function TaskCard({ node, tr, fmt, t, onEdit }: { node: any; tr: (s: string) => string; fmt: (n: number) => string; t: (key: TKey) => string; onEdit: () => void }) {
+  const cost = Number(node.expectedCost || 0);
+  const paid = Number(node._paid || 0);
+  const total = Number(node._totalMilestoned || 0);
+  const remaining = total - paid;
+  const pct = total > 0 ? Math.round((paid / total) * 100) : 0;
+
+  return (
+    <div
+      onClick={onEdit}
+      className="group relative cursor-pointer overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] p-4 shadow-sm transition-all duration-200 hover:scale-[1.02] hover:shadow-[0_8px_30px_rgba(26,23,20,0.08)] hover:border-[var(--accent)]/30"
+    >
+      {/* Status accent line */}
+      <div className={`absolute inset-x-0 top-0 h-1 ${
+        node.status === "COMPLETED" ? "bg-[var(--success)]" :
+        node.status === "IN_PROGRESS" ? "bg-[var(--accent)]" :
+        node.status === "CANCELLED" ? "bg-[var(--alert)]" :
+        "bg-[var(--border)]"
+      }`} />
+
+      {/* Header: name + status */}
+      <div className="mb-3 flex items-start justify-between gap-2">
+        <h3 className="text-sm font-bold text-[var(--fg)] leading-tight">{tr(node.name)}</h3>
+        <StatusBadge status={node.status} />
+      </div>
+
+      {/* Tags row: vendor + category */}
+      <div className="mb-3 flex flex-wrap gap-1.5">
+        {node.vendor?.name && (
+          <span className="rounded-lg bg-[var(--border-subtle)] px-2 py-0.5 text-[10px] font-medium text-[var(--fg-secondary)]">
+            {tr(node.vendor.name)}
+          </span>
+        )}
+        {node.category?.name && (
+          <span className="rounded-lg bg-[var(--accent-soft)] px-2 py-0.5 text-[10px] font-bold uppercase text-[var(--accent)]">
+            {tr(node.category.name)}
+          </span>
+        )}
+        {node._count?.children > 0 && (
+          <span className="rounded-lg bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-600">
+            {node._count.children} sub-tasks
+          </span>
+        )}
+      </div>
+
+      {/* Cost section */}
+      {cost > 0 ? (
+        <div className="space-y-2">
+          {/* Progress bar */}
+          <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--border-subtle)]">
+            <div
+              className="h-full rounded-full transition-all duration-700 ease-out"
+              style={{
+                width: `${Math.min(pct, 100)}%`,
+                background: pct >= 100 ? "var(--success)" : "linear-gradient(90deg, var(--accent), #C9A87C)",
+              }}
+            />
+          </div>
+
+          {/* Cost numbers */}
+          <div className="flex items-center justify-between text-[11px]">
+            <div className="flex items-center gap-1">
+              <span className="font-bold text-[var(--success)]">{fmt(paid)}</span>
+              <span className="text-[var(--fg-muted)]">/</span>
+              <span className="font-semibold text-[var(--fg)]">{fmt(cost)}</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              {pct > 0 && (
+                <span className="rounded-md bg-[var(--success-soft)] px-1.5 py-0.5 text-[9px] font-bold text-[var(--success)]">{pct}%</span>
+              )}
+              {remaining > 0 && (
+                <span className="font-semibold text-[var(--alert)]">{fmt(remaining)} {t("task.left")}</span>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <p className="text-xs italic text-[var(--fg-muted)]">{t("task.noCost")}</p>
+      )}
+
+      {/* Counts row */}
+      {(node._count?.milestones > 0 || node._count?.issues > 0 || node._count?.receipts > 0) && (
+        <div className="mt-3 flex gap-3 border-t border-[var(--border-subtle)] pt-2 text-[10px] text-[var(--fg-muted)]">
+          {node._count?.milestones > 0 && <span>{node._count.milestones} {t("task.milestones").toLowerCase()}</span>}
+          {node._count?.issues > 0 && <span className="text-[var(--alert)]">{node._count.issues} {t("nav.issues").toLowerCase()}</span>}
+          {node._count?.receipts > 0 && <span>{node._count.receipts} {t("task.receipts").toLowerCase()}</span>}
+        </div>
       )}
     </div>
   );

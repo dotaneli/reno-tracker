@@ -160,6 +160,19 @@ const dict = {
 
   // ── Task categories ──
   "task.rooms": { en: "Rooms", he: "חדרים" },
+  "task.search": { en: "Search tasks...", he: "חפש משימות..." },
+  "task.sortBy": { en: "Sort by", he: "מיין לפי" },
+  "task.sortDefault": { en: "Default", he: "ברירת מחדל" },
+  "task.sortPrice": { en: "Price", he: "מחיר" },
+  "task.sortCategory": { en: "Category", he: "קטגוריה" },
+  "task.sortVendor": { en: "Vendor", he: "ספק" },
+  "task.sortStatus": { en: "Status", he: "סטטוס" },
+  "task.sortPayment": { en: "Payment %", he: "% תשלום" },
+  "task.viewList": { en: "List", he: "רשימה" },
+  "task.viewCards": { en: "Cards", he: "כרטיסים" },
+  "task.budgetRemaining": { en: "Budget Remaining", he: "תקציב שנותר" },
+  "task.noCost": { en: "No cost set", he: "לא הוגדרה עלות" },
+  "task.ofBudget": { en: "of budget", he: "מתוך התקציב" },
 
   // ── Categories ──
   "cat.title": { en: "Categories", he: "קטגוריות" },

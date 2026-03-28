@@ -10,7 +10,7 @@ import { Card, StatCard } from "@/components/Card";
 import { Expandable } from "@/components/Expandable";
 import { TaskLine, MilestoneLine } from "@/components/TaskLine";
 import { StatusBadge } from "@/components/StatusBadge";
-import { Wallet, TrendingUp, AlertTriangle, CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
+import { Wallet, TrendingUp, AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, PiggyBank } from "lucide-react";
 
 export default function CostsPage() {
   const { t, lang } = useI18n();
@@ -63,11 +63,10 @@ export default function CostsPage() {
       <h1 className="text-xl md:text-2xl font-bold tracking-tight text-[var(--fg)]">{t("costs.title")}</h1>
 
       {/* ALL stats expandable */}
-      <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
+      <div className="grid gap-3 grid-cols-2 md:grid-cols-5">
         <StatCard label={t("dash.budget")} value={fmt(fin.totalBudget)} icon={<Wallet size={18} />}>
           <div className="space-y-1 text-xs">
             <div className="flex justify-between"><span className="text-[var(--fg-muted)]">{t("costs.totalCost")}</span><span className="font-semibold">{fmt(fin.totalCost)}</span></div>
-            <div className="flex justify-between"><span className="text-[var(--fg-muted)]">{t("dash.remaining")}</span><span className={`font-semibold ${fin.budgetRemaining >= 0 ? "text-[var(--success)]" : "text-[var(--alert)]"}`}>{fmt(fin.budgetRemaining)}</span></div>
             <div className="flex justify-between"><span className="text-[var(--fg-muted)]">{t("dash.tasks")}</span><span>{costNodes.length}</span></div>
           </div>
         </StatCard>
@@ -89,6 +88,15 @@ export default function CostsPage() {
           <div className="max-h-40 overflow-y-auto space-y-0.5">
             {fin.unpaidMilestones.length === 0 ? <p className="text-xs text-[var(--fg-muted)]">—</p> :
               fin.unpaidMilestones.map((m: any) => <MilestoneLine key={m.id} m={m} tr={tr} />)}
+          </div>
+        </StatCard>
+
+        <StatCard label={t("task.budgetRemaining")} value={fmt(fin.budgetRemaining)} accent={fin.budgetRemaining < 0} icon={<PiggyBank size={18} />}>
+          <div className="space-y-1 text-xs">
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--border-subtle)]">
+              <div className={`h-full rounded-full ${fin.budgetRemaining >= 0 ? "bg-[var(--success)]" : "bg-[var(--alert)]"}`} style={{ width: `${Math.min(fin.costPct, 100)}%` }} />
+            </div>
+            <p className="text-center text-[10px] text-[var(--fg-muted)]">{fin.costPct}% of budget allocated</p>
           </div>
         </StatCard>
       </div>
