@@ -126,10 +126,13 @@ export default function IssuesPage() {
                 {editId === issue.id ? (
                   /* ── Inline edit ── */
                   <form onSubmit={handleEdit} className="space-y-3">
-                    <div className="flex items-center gap-2 mb-1">
-                      <AlertCircle size={14} className="text-[var(--accent)]" />
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent)]">{t("crud.edit")}</p>
-                    </div>
+                    <button type="button" onClick={() => setEditId(null)} className="flex w-full items-center justify-between rounded-lg px-1 py-1 -mx-1 transition-colors hover:bg-[var(--border-subtle)]">
+                      <div className="flex items-center gap-2">
+                        <AlertCircle size={14} className="text-[var(--accent)]" />
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent)]">{t("crud.edit")}</p>
+                      </div>
+                      <X size={14} className="text-[var(--fg-muted)]" />
+                    </button>
                     <input type="text" placeholder={t("issues.issueTitle")} value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} required className={input} autoFocus />
                     <div className="grid grid-cols-2 gap-3">
                       <div className="relative">
@@ -170,8 +173,8 @@ export default function IssuesPage() {
                           <CheckCircle2 size={16} />
                         </button>
                       )}
-                      <button onClick={() => startEdit(issue)} className="rounded-lg p-2 text-[var(--fg-muted)]/30 transition-all hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]" title={t("crud.edit")}>
-                        <Pencil size={14} />
+                      <button onClick={() => editId === issue.id ? setEditId(null) : startEdit(issue)} className={`rounded-lg p-2 transition-all ${editId === issue.id ? "bg-[var(--accent)] text-white hover:bg-[var(--alert)]" : "text-[var(--fg-muted)]/30 hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]"}`} title={editId === issue.id ? t("task.cancel") : t("crud.edit")}>
+                        {editId === issue.id ? <X size={14} /> : <Pencil size={14} />}
                       </button>
                       <button onClick={() => handleDelete(issue)} className="rounded-lg p-2 text-[var(--fg-muted)]/30 transition-all hover:bg-[var(--alert-soft)] hover:text-[var(--alert)]" title={t("crud.delete")}>
                         <Trash2 size={14} />

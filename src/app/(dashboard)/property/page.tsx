@@ -8,7 +8,7 @@ import { useTranslate } from "@/hooks/useTranslate";
 import { Card } from "@/components/Card";
 import { Expandable } from "@/components/Expandable";
 import { TaskLine } from "@/components/TaskLine";
-import { Plus, Trash2, Pencil, Home, ChevronDown, DoorOpen } from "lucide-react";
+import { Plus, Trash2, Pencil, X, Home, ChevronDown, DoorOpen } from "lucide-react";
 import { mutate } from "swr";
 
 const input = "w-full rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] px-4 py-3 text-sm text-[var(--fg)] placeholder-[var(--fg-muted)]/60 outline-none transition-all focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/10";
@@ -187,10 +187,13 @@ export default function PropertyPage() {
                         {editRoom?.id === room.id ? (
                           /* ── Inline edit ── */
                           <form onSubmit={updateRoom} className="space-y-2">
-                            <div className="flex items-center gap-2 mb-1">
-                              <DoorOpen size={14} className="text-[var(--accent)]" />
-                              <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent)]">{t("crud.edit")}</p>
-                            </div>
+                            <button type="button" onClick={() => setEditRoom(null)} className="flex w-full items-center justify-between rounded-lg px-1 py-1 -mx-1 transition-colors hover:bg-[var(--border-subtle)]">
+                              <div className="flex items-center gap-2">
+                                <DoorOpen size={14} className="text-[var(--accent)]" />
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent)]">{t("crud.edit")}</p>
+                              </div>
+                              <X size={14} className="text-[var(--fg-muted)]" />
+                            </button>
                             <input type="text" value={editRoom!.name} onChange={(e) => setEditRoom({ id: editRoom!.id, name: e.target.value, type: editRoom!.type })} required className={input} autoFocus />
                             <div className="flex gap-2">
                               <div className="relative flex-1">
@@ -225,7 +228,9 @@ export default function PropertyPage() {
                                 )}
                               </div>
                               <div className="flex shrink-0 items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
-                                <button onClick={() => setEditRoom({ id: room.id, name: room.name, type: room.type })} className="rounded-lg p-1.5 text-[var(--fg-muted)]/30 hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]"><Pencil size={12} /></button>
+                                <button onClick={() => editRoom?.id === room.id ? setEditRoom(null) : setEditRoom({ id: room.id, name: room.name, type: room.type })} className={`rounded-lg p-1.5 transition-all ${editRoom?.id === room.id ? "bg-[var(--accent)] text-white hover:bg-[var(--alert)]" : "text-[var(--fg-muted)]/30 hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]"}`}>
+                                  {editRoom?.id === room.id ? <X size={12} /> : <Pencil size={12} />}
+                                </button>
                                 <button onClick={() => deleteRoom(room)} className="rounded-lg p-1.5 text-[var(--fg-muted)]/30 hover:bg-[var(--alert-soft)] hover:text-[var(--alert)]"><Trash2 size={12} /></button>
                               </div>
                             </div>

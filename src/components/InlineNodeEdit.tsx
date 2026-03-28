@@ -5,7 +5,7 @@ import { useI18n, type TKey } from "@/lib/i18n";
 import { apiPatch } from "@/hooks/useApi";
 import { InlineCreateSelect } from "./InlineCreateSelect";
 import { RoomMultiSelect } from "./RoomMultiSelect";
-import { ChevronDown, Pencil } from "lucide-react";
+import { ChevronDown, X } from "lucide-react";
 import { apiPost } from "@/hooks/useApi";
 
 const input = "w-full rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] px-4 py-3 text-sm text-[var(--fg)] placeholder-[var(--fg-muted)]/60 outline-none transition-all focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/10";
@@ -58,10 +58,10 @@ export function InlineNodeEdit({ node, projectId, allNodes, vendors, categories,
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3" onClick={(e) => e.stopPropagation()}>
-      <div className="flex items-center gap-2 mb-1">
-        <Pencil size={13} className="text-[var(--accent)]" />
+      <button type="button" onClick={onCancel} className="flex w-full items-center justify-between rounded-lg px-1 py-1 -mx-1 transition-colors hover:bg-[var(--border-subtle)]">
         <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent)]">{t("crud.edit")}</p>
-      </div>
+        <X size={14} className="text-[var(--fg-muted)] hover:text-[var(--fg)]" />
+      </button>
       <input type="text" placeholder={t("task.name")} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required className={input} autoFocus />
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="relative">

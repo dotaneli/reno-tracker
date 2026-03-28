@@ -95,10 +95,13 @@ export default function CategoriesPage() {
               {editId === cat.id ? (
                 /* ── Inline edit ── */
                 <form onSubmit={handleEdit} className="space-y-3">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Tag size={14} className="text-[var(--accent)]" />
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent)]">{t("crud.edit")}</p>
-                  </div>
+                  <button type="button" onClick={() => setEditId(null)} className="flex w-full items-center justify-between rounded-lg px-1 py-1 -mx-1 transition-colors hover:bg-[var(--border-subtle)]">
+                    <div className="flex items-center gap-2">
+                      <Tag size={14} className="text-[var(--accent)]" />
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent)]">{t("crud.edit")}</p>
+                    </div>
+                    <X size={14} className="text-[var(--fg-muted)]" />
+                  </button>
                   <div className="flex gap-3">
                     <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} required className={`${input} flex-1`} autoFocus />
                     <button type="submit" className="shrink-0 rounded-xl bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-white">{t("task.save")}</button>
@@ -132,7 +135,9 @@ export default function CategoriesPage() {
                       )}
                     </div>
                     <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                      <button onClick={() => startEdit(cat)} className="rounded-lg bg-[var(--fg)]/5 p-1.5 text-[var(--fg)] hover:bg-[var(--accent)] hover:text-white"><Pencil size={13} /></button>
+                      <button onClick={() => editId === cat.id ? setEditId(null) : startEdit(cat)} className={`rounded-lg p-1.5 transition-all ${editId === cat.id ? "bg-[var(--accent)] text-white hover:bg-[var(--alert)]" : "bg-[var(--fg)]/5 text-[var(--fg)] hover:bg-[var(--accent)] hover:text-white"}`}>
+                        {editId === cat.id ? <X size={13} /> : <Pencil size={13} />}
+                      </button>
                       <button onClick={() => handleDelete(cat)} className="rounded-lg bg-[var(--fg)]/5 p-1.5 text-[var(--fg)] hover:bg-[var(--alert)] hover:text-white"><Trash2 size={13} /></button>
                     </div>
                   </div>

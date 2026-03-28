@@ -8,7 +8,7 @@ import { useApi, apiPost, apiPatch, apiDelete } from "@/hooks/useApi";
 import { useTranslate } from "@/hooks/useTranslate";
 import { Card } from "@/components/Card";
 import { TaskLine } from "@/components/TaskLine";
-import { Plus, X, Pencil, Trash2, Phone, Mail, Tag, Truck, Check } from "lucide-react";
+import { Plus, X, Pencil, Trash2, Phone, Mail, Tag, Truck } from "lucide-react";
 import { mutate } from "swr";
 
 const input = "w-full rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] px-4 py-3 text-sm text-[var(--fg)] placeholder-[var(--fg-muted)]/60 outline-none transition-all focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/10";
@@ -111,10 +111,13 @@ export default function VendorsPage() {
               {editId === v.id ? (
                 /* ── Inline edit form ── */
                 <form onSubmit={handleEdit} className="space-y-3">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Truck size={16} className="text-[var(--accent)]" />
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent)]">{t("crud.edit")}</p>
-                  </div>
+                  <button type="button" onClick={() => setEditId(null)} className="flex w-full items-center justify-between rounded-lg px-1 py-1 -mx-1 transition-colors hover:bg-[var(--border-subtle)]">
+                    <div className="flex items-center gap-2">
+                      <Truck size={14} className="text-[var(--accent)]" />
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent)]">{t("crud.edit")}</p>
+                    </div>
+                    <X size={14} className="text-[var(--fg-muted)]" />
+                  </button>
                   <input type="text" placeholder={t("vendor.name")} value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} required className={input} autoFocus />
                   <input type="text" placeholder={t("vendor.category")} value={editForm.category} onChange={(e) => setEditForm({ ...editForm, category: e.target.value })} className={input} />
                   <div className="grid grid-cols-2 gap-3">
@@ -158,7 +161,9 @@ export default function VendorsPage() {
                       )}
                     </div>
                     <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                      <button onClick={() => startEdit(v)} className="rounded-lg bg-[var(--fg)]/5 p-1.5 text-[var(--fg)] hover:bg-[var(--accent)] hover:text-white"><Pencil size={13} /></button>
+                      <button onClick={() => editId === v.id ? setEditId(null) : startEdit(v)} className={`rounded-lg p-1.5 transition-all ${editId === v.id ? "bg-[var(--accent)] text-white hover:bg-[var(--alert)]" : "bg-[var(--fg)]/5 text-[var(--fg)] hover:bg-[var(--accent)] hover:text-white"}`}>
+                        {editId === v.id ? <X size={13} /> : <Pencil size={13} />}
+                      </button>
                       <button onClick={() => handleDelete(v)} className="rounded-lg bg-[var(--fg)]/5 p-1.5 text-[var(--fg)] hover:bg-[var(--alert)] hover:text-white"><Trash2 size={13} /></button>
                     </div>
                   </div>

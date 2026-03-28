@@ -416,8 +416,9 @@ function TaskCard({ node, parentName, tr, fmt, t, isEditing, onEdit, onEditDone,
                 <CheckCircle2 size={14} /> {t("task.markDone")}
               </button>
             )}
-            <button onClick={(e) => { e.stopPropagation(); if (isEditing) onEditCancel(); else onEdit(); }} className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-all ${isEditing ? "bg-[var(--accent)] text-white" : "bg-[var(--fg)]/5 text-[var(--fg)] hover:bg-[var(--accent)] hover:text-white"}`}>
-              <Pencil size={13} /> {t("crud.edit")}
+            <button onClick={(e) => { e.stopPropagation(); if (isEditing) onEditCancel(); else onEdit(); }} className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition-all ${isEditing ? "bg-[var(--accent)] text-white hover:bg-[var(--alert)]" : "bg-[var(--fg)]/5 text-[var(--fg)] hover:bg-[var(--accent)] hover:text-white"}`}>
+              {isEditing ? <X size={13} /> : <Pencil size={13} />}
+              {isEditing ? t("task.cancel") : t("crud.edit")}
             </button>
             <button onClick={handleDelete} className="flex items-center gap-1.5 rounded-lg bg-[var(--fg)]/5 px-3 py-2 text-xs font-semibold text-[var(--fg)] transition-all hover:bg-[var(--alert)] hover:text-white">
               <Trash2 size={13} /> {t("crud.delete")}

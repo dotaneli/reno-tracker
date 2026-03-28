@@ -12,7 +12,7 @@ import {
 } from "@dnd-kit/core";
 import { useDraggable } from "@dnd-kit/core";
 import { InlineNodeEdit } from "./InlineNodeEdit";
-import { ChevronRight, DollarSign, Calendar, Pencil, Trash2, Plus, GripVertical, CornerLeftUp, CheckCircle2 } from "lucide-react";
+import { ChevronRight, DollarSign, Calendar, Pencil, X, Trash2, Plus, GripVertical, CornerLeftUp, CheckCircle2 } from "lucide-react";
 
 const inp = "w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)] placeholder-[var(--fg-muted)]/60 outline-none focus:border-[var(--accent)]";
 
@@ -220,7 +220,11 @@ function NodeRow({ node, depth = 0, projectId, vendors, categories, floors, allN
               </button>
             )}
             <button onClick={() => { setAdding(!adding); setExpanded(true); }} className="rounded-lg bg-[var(--fg)]/5 p-1.5 text-[var(--fg)] hover:bg-[var(--fg)] hover:text-[var(--bg-elevated)]"><Plus size={14} /></button>
-            <button onClick={() => onEdit(node)} className="rounded-lg bg-[var(--fg)]/5 p-1.5 text-[var(--fg)] hover:bg-[var(--accent)] hover:text-white"><Pencil size={13} /></button>
+            {editNodeId === node.id ? (
+              <button onClick={() => onEditCancel?.()} className="rounded-lg bg-[var(--accent)] p-1.5 text-white hover:bg-[var(--alert)] hover:text-white" title={t("task.cancel")}><X size={13} /></button>
+            ) : (
+              <button onClick={() => onEdit(node)} className="rounded-lg bg-[var(--fg)]/5 p-1.5 text-[var(--fg)] hover:bg-[var(--accent)] hover:text-white" title={t("crud.edit")}><Pencil size={13} /></button>
+            )}
             <button onClick={handleDelete} className="rounded-lg bg-[var(--fg)]/5 p-1.5 text-[var(--fg)] hover:bg-[var(--alert)] hover:text-white"><Trash2 size={13} /></button>
           </div>
         </div>
