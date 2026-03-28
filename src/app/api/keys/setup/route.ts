@@ -3,9 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/dal";
 import { json, errorResponse, handleError } from "@/lib/api";
 
-const BASE_URL = process.env.NEXTAUTH_URL || process.env.VERCEL_URL
-  ? `https://${process.env.VERCEL_URL}`
-  : "http://localhost:3000";
+const BASE_URL = process.env.NEXTAUTH_URL || "https://reno-tracker-rho.vercel.app";
 
 function getSetupPayload(platform: string, keyPlaintext: string, apiUrl: string) {
   const systemPrompt = `You are a renovation project assistant connected to Reno Tracker.
