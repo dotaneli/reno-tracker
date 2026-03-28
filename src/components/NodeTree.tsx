@@ -240,7 +240,7 @@ function NodeRow({ node, depth = 0, projectId, vendors, categories, floors, allN
       {/* Milestones */}
       {showMilestones && hasCost && (
         <div className="ms-3 md:ms-7 mt-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-3">
-          <ItemMilestones itemId={node.id} expectedCost={ownCost} />
+          <ItemMilestones itemId={node.id} expectedCost={ownCost} onMutate={onMutate} />
         </div>
       )}
 

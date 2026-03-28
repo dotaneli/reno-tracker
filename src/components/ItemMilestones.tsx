@@ -12,9 +12,10 @@ const input = "w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px
 interface Props {
   itemId: string;
   expectedCost: number | null;
+  onMutate?: () => void;
 }
 
-export function ItemMilestones({ itemId, expectedCost }: Props) {
+export function ItemMilestones({ itemId, expectedCost, onMutate: onParentMutate }: Props) {
   const { t, lang } = useI18n();
   const [showAddForm, setShowAddForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -25,7 +26,7 @@ export function ItemMilestones({ itemId, expectedCost }: Props) {
   const [editFile, setEditFile] = useState<File | null>(null);
 
   const { data: milestones } = useApi<any[]>(`/api/nodes/${itemId}/milestones`);
-  const mutateMilestones = () => mutate(`/api/nodes/${itemId}/milestones`);
+  const mutateMilestones = () => { mutate(`/api/nodes/${itemId}/milestones`); onParentMutate?.(); };
 
   const fmt = (n: number) =>
     new Intl.NumberFormat(lang === "he" ? "he-IL" : "en-IL", { style: "currency", currency: "ILS", maximumFractionDigits: 0 }).format(n);

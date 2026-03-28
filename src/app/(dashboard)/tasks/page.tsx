@@ -48,7 +48,7 @@ export default function TasksPage() {
   ], [allNodesFlat, vendors, categories]);
   const tr = useTranslate(allTexts);
 
-  const mutateAll = () => { mutate(`/api/nodes?projectId=${project?.id}&tree=true`); mutate(`/api/nodes?projectId=${project?.id}`); mutate(`/api/vendors?projectId=${project?.id}`); mutate(`/api/categories?projectId=${project?.id}`); };
+  const mutateAll = () => { mutate(`/api/nodes?projectId=${project?.id}&tree=true`); mutate(`/api/nodes?projectId=${project?.id}`); mutate(`/api/vendors?projectId=${project?.id}`); mutate(`/api/categories?projectId=${project?.id}`); mutate(`/api/projects/${project?.id}/milestones`); mutate("/api/projects"); };
 
   const fmt = (n: number) => new Intl.NumberFormat(lang === "he" ? "he-IL" : "en-IL", { style: "currency", currency: "ILS", maximumFractionDigits: 0 }).format(n);
 
@@ -434,7 +434,7 @@ function TaskCard({ node, parentName, tr, fmt, t, isEditing, onEdit, onEditDone,
 
           {/* Payment milestones */}
           {cost > 0 && !isEditing && (
-            <ItemMilestones itemId={node.id} expectedCost={cost} />
+            <ItemMilestones itemId={node.id} expectedCost={cost} onMutate={onMutate} />
           )}
 
           {/* Children preview */}
