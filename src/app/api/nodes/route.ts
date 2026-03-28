@@ -89,9 +89,16 @@ export async function POST(request: Request) {
 
     // If parentId provided, verify it exists and belongs to same project
     if (body.parentId) {
-      const parent = await prisma.projectNode.findUnique({ where: { id: body.parentId }, select: { projectId: true } });
+      const parent = await prisma.projectNode.findUnique({ where: { id: body.parentId }, select: { projectId: true, expectedCost: true } });
       if (!parent || parent.projectId !== body.projectId) return errorResponse("Invalid parentId", 400);
+      // Guard: don't allow cost on child if parent already has cost (would double-count)
+      if (body.expectedCost && parent.expectedCost) {
+        return errorResponse("Cannot set cost on a sub-task when the parent task already has a cost. Remove the parent's cost first, or add this as a root task.", 400);
+      }
     }
+
+    // Guard: if this node has cost and is being created as a root, that's fine.
+    // But if it has cost, check it won't become a parent that also has children with cost later — that's handled on update.
 
     const node = await prisma.projectNode.create({
       data: {

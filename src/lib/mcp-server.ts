@@ -365,8 +365,9 @@ export async function executeTool(toolName: string, args: Record<string, any>, a
       checkProjectScope(auth, projectId);
       await requireProjectAccess(userId, projectId, ["OWNER", "EDITOR"]);
       if (parentId) {
-        const parent = await prisma.projectNode.findUnique({ where: { id: parentId }, select: { projectId: true } });
+        const parent = await prisma.projectNode.findUnique({ where: { id: parentId }, select: { projectId: true, expectedCost: true } });
         if (!parent || parent.projectId !== projectId) throw new AuthError("Invalid parentId", 400);
+        if (expectedCost && parent.expectedCost) throw new AuthError("Cannot set cost on a sub-task when the parent already has a cost (would double-count)", 400);
       }
       const node = await prisma.projectNode.create({
         data: { name: name.trim(), projectId, parentId: parentId || null, expectedCost, vendorId: vendorId || null, categoryId: categoryId || null, status: status as any || undefined },
@@ -383,6 +384,17 @@ export async function executeTool(toolName: string, args: Record<string, any>, a
       checkProjectScope(auth, nodeInfo.projectId);
       await requireProjectAccess(userId, nodeInfo.projectId, ["OWNER", "EDITOR"]);
       const oldNode = await prisma.projectNode.findUnique({ where: { id: nodeId } });
+
+      // Guard: prevent double-counting
+      if (updates.expectedCost !== undefined && updates.expectedCost !== null) {
+        const childrenWithCost = await prisma.projectNode.count({ where: { parentId: nodeId, expectedCost: { not: null } } });
+        if (childrenWithCost > 0) throw new AuthError("Cannot set cost on a task with costed sub-tasks (would double-count)", 400);
+        if (oldNode?.parentId) {
+          const parent = await prisma.projectNode.findUnique({ where: { id: oldNode.parentId }, select: { expectedCost: true } });
+          if (parent?.expectedCost) throw new AuthError("Cannot set cost on a sub-task when parent already has a cost (would double-count)", 400);
+        }
+      }
+
       const data: any = {};
       if (updates.name !== undefined) data.name = updates.name.trim();
       if (updates.status !== undefined) data.status = updates.status;

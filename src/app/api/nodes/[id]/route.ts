@@ -49,6 +49,24 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       }
     }
 
+    // Guard: prevent double-counting — no cost on nodes with costed children (or vice versa)
+    if (body.expectedCost !== undefined && body.expectedCost !== null) {
+      // Check if this node has children with costs
+      const childrenWithCost = await prisma.projectNode.count({
+        where: { parentId: id, expectedCost: { not: null } },
+      });
+      if (childrenWithCost > 0) {
+        return errorResponse("Cannot set cost on a task that has sub-tasks with costs — this would double-count. Set costs on individual sub-tasks instead.", 400);
+      }
+      // Check if parent already has cost
+      if (oldNode?.parentId) {
+        const parent = await prisma.projectNode.findUnique({ where: { id: oldNode.parentId }, select: { expectedCost: true } });
+        if (parent?.expectedCost) {
+          return errorResponse("Cannot set cost on a sub-task when the parent task already has a cost. Remove the parent's cost first.", 400);
+        }
+      }
+    }
+
     // Replace room links if provided
     if (body.roomIds) {
       await prisma.nodeRoom.deleteMany({ where: { nodeId: id } });
