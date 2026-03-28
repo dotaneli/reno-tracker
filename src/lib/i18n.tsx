@@ -179,6 +179,14 @@ const dict = {
   "task.allRooms": { en: "All rooms assigned", he: "כל החדרים שויכו" },
   "costs.unscheduled": { en: "Unscheduled", he: "לא מתוכנן" },
   "prop.selectFloor": { en: "Select floor", he: "בחר קומה" },
+  "export.title": { en: "Export & Share", he: "ייצוא ושיתוף" },
+  "export.sheets": { en: "Google Sheets", he: "Google Sheets" },
+  "export.sheetsDesc": { en: "Download CSV — open in Google Sheets", he: "הורד CSV — פתח ב-Google Sheets" },
+  "export.docs": { en: "Full Report", he: "דוח מלא" },
+  "export.docsDesc": { en: "Download styled HTML report — open in Google Docs", he: "הורד דוח מעוצב — פתח ב-Google Docs" },
+  "export.whatsapp": { en: "WhatsApp", he: "WhatsApp" },
+  "export.whatsappDesc": { en: "Share a project summary via WhatsApp", he: "שתף סיכום פרויקט ב-WhatsApp" },
+  "export.copied": { en: "Copied to clipboard!", he: "הועתק!" },
 
   // ── Categories ──
   "cat.title": { en: "Categories", he: "קטגוריות" },
