@@ -1,68 +1,43 @@
 import { prisma } from "@/lib/prisma";
-import {
-  json,
-  errorResponse,
-  handlePrismaError,
-  parseBody,
-  type IssueUpdateBody,
-} from "@/lib/api";
+import { requireUser, requireIssueAccess } from "@/lib/dal";
+import { json, handleError, parseBody, type IssueUpdateBody } from "@/lib/api";
 
-// GET /api/issues/:id
-export async function GET(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { userId } = await requireUser();
     const { id } = await params;
-    const issue = await prisma.issue.findUnique({
-      where: { id },
-      include: { phase: true },
-    });
-
-    if (!issue) return errorResponse("Issue not found", 404);
+    await requireIssueAccess(userId, id);
+    const issue = await prisma.issue.findUnique({ where: { id }, include: { node: true } });
     return json(issue);
-  } catch (err) {
-    return handlePrismaError(err);
-  }
+  } catch (err) { return handleError(err); }
 }
 
-// PATCH /api/issues/:id
-export async function PATCH(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { userId } = await requireUser();
     const { id } = await params;
+    await requireIssueAccess(userId, id, ["OWNER", "EDITOR"]);
     const body = await parseBody<IssueUpdateBody>(request);
-
     const issue = await prisma.issue.update({
       where: { id },
       data: {
         ...(body.title !== undefined && { title: body.title.trim() }),
         ...(body.description !== undefined && { description: body.description }),
-        ...(body.status !== undefined && { status: body.status }),
-        ...(body.phaseId !== undefined && { phaseId: body.phaseId }),
+        ...(body.status !== undefined && { status: body.status as any }),
+        ...(body.nodeId !== undefined && { nodeId: body.nodeId }),
       },
-      include: { phase: true },
+      include: { node: true },
     });
-
     return json(issue);
-  } catch (err) {
-    if (err instanceof SyntaxError) return errorResponse("Invalid JSON body", 400);
-    return handlePrismaError(err);
-  }
+  } catch (err) { return handleError(err); }
 }
 
-// DELETE /api/issues/:id
-export async function DELETE(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { userId } = await requireUser();
     const { id } = await params;
+    await requireIssueAccess(userId, id, ["OWNER", "EDITOR"]);
     await prisma.issue.delete({ where: { id } });
     return new Response(null, { status: 204 });
-  } catch (err) {
-    return handlePrismaError(err);
-  }
+  } catch (err) { return handleError(err); }
 }

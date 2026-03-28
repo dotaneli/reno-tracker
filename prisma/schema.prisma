@@ -7,34 +7,325 @@ datasource db {
   provider = "postgresql"
 }
 
-model Project {
-  id           String   @id @default(cuid())
-  name         String
-  totalBudget  Decimal  @db.Decimal(12, 2)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+// ── Auth.js models ───────────────────────────────────────
 
-  phases       Phase[]
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts    Account[]
+  sessions    Session[]
+  memberships ProjectMember[]
+  notes       Note[]
+  snapshots   ProjectSnapshot[]
+  apiKeys     ApiKey[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ── API Keys (LLM Agent Auth) ────────────────────────────
+
+model ApiKey {
+  id         String      @id @default(cuid())
+  name       String
+  keyHash    String      @unique
+  keyPrefix  String                          // first 8 chars for display: "rk_ab12..."
+  scope      ApiKeyScope @default(READ_WRITE)
+  lastUsedAt DateTime?
+  expiresAt  DateTime?
+  createdAt  DateTime    @default(now())
+
+  userId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  actionLogs ActionLog[]
+
+  @@index([userId])
+  @@map("api_keys")
+}
+
+enum ApiKeyScope {
+  READ_ONLY
+  READ_WRITE
+  ADMIN
+}
+
+// ── Multi-tenancy ────────────────────────────────────────
+
+model Project {
+  id                String    @id @default(cuid())
+  name              String
+  totalBudget       Decimal   @db.Decimal(12, 2)
+  expectedStartDate DateTime?
+  expectedEndDate   DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  floors         Floor[]
+  vendors        Vendor[]
+  categories     Category[]
+  nodes          ProjectNode[]
+  members        ProjectMember[]
+  pendingInvites PendingInvite[]
+  snapshots      ProjectSnapshot[]
+  actionLogs     ActionLog[]
+  apiKeys        ApiKey[]
 
   @@map("projects")
 }
 
-model Phase {
-  id        String      @id @default(cuid())
-  name      String
-  status    PhaseStatus @default(NOT_STARTED)
-  startDate DateTime?
-  endDate   DateTime?
+model ActionLog {
+  id        String   @id @default(cuid())
+  action    String
+  entity    String
+  entityId  String
+  oldData   Json?
+  newData   Json?
+  undone    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
   projectId String
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  project   Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  items     Item[]
-  issues    Issue[]
+  userId String
 
-  @@map("phases")
+  apiKeyId String?
+  apiKey   ApiKey? @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, createdAt])
+  @@map("action_logs")
 }
+
+model ProjectMember {
+  id        String      @id @default(cuid())
+  role      ProjectRole @default(VIEWER)
+  createdAt DateTime    @default(now())
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@map("project_members")
+}
+
+model PendingInvite {
+  id        String      @id @default(cuid())
+  email     String
+  role      ProjectRole @default(EDITOR)
+  createdAt DateTime    @default(now())
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, email])
+  @@map("pending_invites")
+}
+
+enum ProjectRole {
+  OWNER
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+// ── Version History ──────────────────────────────────────
+
+model ProjectSnapshot {
+  id        String   @id @default(cuid())
+  label     String
+  data      Json
+  createdAt DateTime @default(now())
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  authorId String
+  author   User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@map("project_snapshots")
+}
+
+// ── Spatial: Floors & Rooms ──────────────────────────────
+
+model Floor {
+  id        String @id @default(cuid())
+  name      String
+  sortOrder Int    @default(0)
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  rooms Room[]
+
+  @@map("floors")
+}
+
+model Room {
+  id   String   @id @default(cuid())
+  name String
+  type RoomType @default(ROOM)
+
+  floorId String
+  floor   Floor @relation(fields: [floorId], references: [id], onDelete: Cascade)
+
+  nodeRooms NodeRoom[]
+
+  @@map("rooms")
+}
+
+enum RoomType {
+  ROOM
+  BALCONY
+  STORAGE
+  OTHER
+}
+
+// ── ProjectNode (recursive tree) ─────────────────────────
+
+model Category {
+  id        String   @id @default(cuid())
+  name      String
+  color     String?
+  icon      String?
+  createdAt DateTime @default(now())
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  nodes ProjectNode[]
+
+  @@map("categories")
+}
+
+model ProjectNode {
+  id            String      @id @default(cuid())
+  name          String
+  nodeType      NodeType?
+  status        NodeStatus  @default(PENDING)
+
+  categoryId    String?
+  category      Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  expectedCost  Decimal?    @db.Decimal(12, 2)
+  actualCost    Decimal?    @db.Decimal(12, 2)
+  startDate     DateTime?
+  endDate       DateTime?
+  expectedDate  DateTime?
+  completedDate DateTime?
+  sortOrder     Int         @default(0)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  parentId  String?
+  parent    ProjectNode?  @relation("NodeTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children  ProjectNode[] @relation("NodeTree")
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  vendorId  String?
+  vendor    Vendor? @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+
+  rooms      NodeRoom[]
+  milestones PaymentMilestone[]
+  receipts   Receipt[]
+  notes      Note[]
+  issues     Issue[]
+
+  @@map("project_nodes")
+}
+
+model NodeRoom {
+  id String @id @default(cuid())
+
+  nodeId String
+  node   ProjectNode @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  roomId String
+  room   Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@unique([nodeId, roomId])
+  @@map("node_rooms")
+}
+
+enum NodeType {
+  PLUMBING
+  ELECTRICAL
+  CARPENTRY
+  PAINTING
+  FLOORING
+  SMART_HOME
+  AUDIO_VISUAL
+  HVAC
+  WINDOWS_DOORS
+  KITCHEN
+  BATHROOM
+  GENERAL
+}
+
+enum NodeStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  ON_HOLD
+  PENDING
+  ORDERED
+  DELIVERED
+  INSTALLED
+  CANCELLED
+}
+
+// ── Domain models ────────────────────────────────────────
 
 model Vendor {
   id        String   @id @default(cuid())
@@ -45,26 +336,57 @@ model Vendor {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  items     Item[]
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  nodes ProjectNode[]
 
   @@map("vendors")
 }
 
-model Item {
-  id           String     @id @default(cuid())
-  name         String
-  expectedCost Decimal?   @db.Decimal(12, 2)
-  actualCost   Decimal?   @db.Decimal(12, 2)
-  status       ItemStatus @default(PENDING)
-  phaseId      String
-  vendorId     String?
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+model PaymentMilestone {
+  id          String          @id @default(cuid())
+  label       String
+  amount      Decimal         @db.Decimal(12, 2)
+  percentage  Float?
+  dueDate     DateTime?
+  paidDate    DateTime?
+  status      MilestoneStatus @default(PENDING)
+  receiptUrl  String?
+  receiptName String?
+  createdAt   DateTime        @default(now())
 
-  phase        Phase      @relation(fields: [phaseId], references: [id], onDelete: Cascade)
-  vendor       Vendor?    @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  nodeId String
+  node   ProjectNode @relation(fields: [nodeId], references: [id], onDelete: Cascade)
 
-  @@map("items")
+  @@map("payment_milestones")
+}
+
+model Receipt {
+  id         String   @id @default(cuid())
+  fileUrl    String
+  fileName   String
+  fileSize   Int?
+  uploadedAt DateTime @default(now())
+
+  nodeId String
+  node   ProjectNode @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  @@map("receipts")
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  text      String
+  createdAt DateTime @default(now())
+
+  nodeId String
+  node   ProjectNode @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  authorId String
+  author   User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@map("notes")
 }
 
 model Issue {
@@ -72,40 +394,34 @@ model Issue {
   title       String
   description String?
   status      IssueStatus @default(OPEN)
-  phaseId     String
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  phase       Phase       @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+  nodeId String
+  node   ProjectNode @relation(fields: [nodeId], references: [id], onDelete: Cascade)
 
   @@map("issues")
 }
 
 model PendingInbox {
-  id          String       @id @default(cuid())
+  id          String      @id @default(cuid())
   source      String
   rawPayload  Json
-  status      InboxStatus  @default(PENDING)
+  status      InboxStatus @default(PENDING)
   processedAt DateTime?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
 
   @@map("pending_inbox")
 }
 
-enum PhaseStatus {
-  NOT_STARTED
-  IN_PROGRESS
-  COMPLETED
-  ON_HOLD
-}
+// ── Enums ────────────────────────────────────────────────
 
-enum ItemStatus {
+enum MilestoneStatus {
   PENDING
-  ORDERED
-  DELIVERED
-  INSTALLED
-  CANCELLED
+  DUE
+  PAID
+  OVERDUE
 }
 
 enum IssueStatus {

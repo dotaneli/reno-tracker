@@ -1,55 +1,42 @@
 import { prisma } from "@/lib/prisma";
-import {
-  json,
-  errorResponse,
-  handlePrismaError,
-  parseBody,
-  type IssueCreateBody,
-} from "@/lib/api";
+import { requireUser, requireNodeAccess, getUserProjectIds } from "@/lib/dal";
+import { json, errorResponse, handleError, parseBody, type IssueCreateBody } from "@/lib/api";
 
-// GET /api/issues — list issues (optionally filter by phaseId or status)
 export async function GET(request: Request) {
   try {
+    const { userId } = await requireUser();
     const { searchParams } = new URL(request.url);
-    const phaseId = searchParams.get("phaseId");
+    const nodeId = searchParams.get("nodeId");
     const status = searchParams.get("status");
+
+    if (nodeId) await requireNodeAccess(userId, nodeId);
+    const projectIds = await getUserProjectIds(userId);
 
     const issues = await prisma.issue.findMany({
       where: {
-        ...(phaseId && { phaseId }),
-        ...(status && { status: status as "OPEN" | "IN_PROGRESS" | "RESOLVED" }),
+        node: { projectId: { in: projectIds } },
+        ...(nodeId && { nodeId }),
+        ...(status && { status: status as any }),
       },
-      include: { phase: true },
+      include: { node: true },
       orderBy: { createdAt: "desc" },
     });
-
     return json(issues);
-  } catch (err) {
-    return handlePrismaError(err);
-  }
+  } catch (err) { return handleError(err); }
 }
 
-// POST /api/issues
 export async function POST(request: Request) {
   try {
+    const { userId } = await requireUser();
     const body = await parseBody<IssueCreateBody>(request);
-
     if (!body.title?.trim()) return errorResponse("title is required", 400);
-    if (!body.phaseId?.trim()) return errorResponse("phaseId is required", 400);
+    if (!body.nodeId?.trim()) return errorResponse("nodeId is required", 400);
+    await requireNodeAccess(userId, body.nodeId, ["OWNER", "EDITOR"]);
 
     const issue = await prisma.issue.create({
-      data: {
-        title: body.title.trim(),
-        phaseId: body.phaseId,
-        description: body.description?.trim(),
-        status: body.status,
-      },
-      include: { phase: true },
+      data: { title: body.title.trim(), nodeId: body.nodeId, description: body.description?.trim(), status: (body.status as any) || undefined },
+      include: { node: true },
     });
-
     return json(issue, 201);
-  } catch (err) {
-    if (err instanceof SyntaxError) return errorResponse("Invalid JSON body", 400);
-    return handlePrismaError(err);
-  }
+  } catch (err) { return handleError(err); }
 }
