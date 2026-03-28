@@ -58,12 +58,21 @@ export async function GET(request: Request) {
       include: {
         rooms: { include: { room: true } },
         vendor: true,
+        category: true,
+        milestones: { select: { amount: true, status: true } },
         children: { include: { vendor: true, category: true, _count: { select: { children: true, milestones: true, receipts: true, notes: true, issues: true } } }, orderBy: { sortOrder: "asc" } },
         _count: { select: { children: true, milestones: true, receipts: true, notes: true, issues: true } },
       },
       orderBy: { sortOrder: "asc" },
     });
-    return json(nodes);
+
+    // Add _paid and _totalMilestoned (same as tree mode) so TaskLine can show payment status
+    const result = nodes.map((n) => {
+      const paid = n.milestones.filter((m: any) => m.status === "PAID").reduce((s: number, m: any) => s + Number(m.amount), 0);
+      const totalMs = n.milestones.reduce((s: number, m: any) => s + Number(m.amount), 0);
+      return { ...n, milestones: undefined, _paid: paid, _totalMilestoned: totalMs };
+    });
+    return json(result);
   } catch (err) { return handleError(err); }
 }
 
