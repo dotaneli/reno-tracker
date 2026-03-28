@@ -13,43 +13,74 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { mutate } from "swr";
 import { Wallet, TrendingUp, AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, PiggyBank, CircleDollarSign, CheckCircle2 } from "lucide-react";
 
-// ── SVG Donut Chart ──
-function DonutChart({ segments, size = 180, strokeWidth = 28 }: { segments: { value: number; color: string; label: string }[]; size?: number; strokeWidth?: number }) {
+// ── SVG Donut Chart with hover tooltips + data labels ──
+function DonutChart({ segments, size = 200, strokeWidth = 32, fmt }: { segments: { value: number; color: string; label: string }[]; size?: number; strokeWidth?: number; fmt: (n: number) => string }) {
+  const [hover, setHover] = useState<number | null>(null);
   const total = segments.reduce((s, seg) => s + seg.value, 0);
   if (total === 0) return null;
   const r = (size - strokeWidth) / 2;
   const c = Math.PI * 2 * r;
   let offset = 0;
+  const activeSegments = segments.filter(s => s.value > 0);
 
   return (
     <div className="flex flex-col items-center gap-3">
-      <svg width={size} height={size} className="drop-shadow-sm">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--border-subtle)" strokeWidth={strokeWidth} />
-        {segments.filter(s => s.value > 0).map((seg, i) => {
-          const pct = seg.value / total;
-          const dash = c * pct;
-          const gap = c - dash;
-          const currentOffset = offset;
-          offset += pct;
-          return (
-            <circle
-              key={i}
-              cx={size / 2} cy={size / 2} r={r}
-              fill="none" stroke={seg.color} strokeWidth={strokeWidth}
-              strokeDasharray={`${dash} ${gap}`}
-              strokeDashoffset={-c * currentOffset + c * 0.25}
-              strokeLinecap="round"
-              className="transition-all duration-700"
-            />
-          );
-        })}
-      </svg>
-      <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
-        {segments.filter(s => s.value > 0).map((seg, i) => (
-          <div key={i} className="flex items-center gap-1.5 text-[11px]">
-            <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: seg.color }} />
+      <div className="relative">
+        <svg width={size} height={size} className="drop-shadow-sm">
+          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--border-subtle)" strokeWidth={strokeWidth} />
+          {activeSegments.map((seg, i) => {
+            const pct = seg.value / total;
+            const dash = c * pct;
+            const gap = c - dash;
+            const currentOffset = offset;
+            offset += pct;
+            const isHovered = hover === i;
+            return (
+              <circle
+                key={i}
+                cx={size / 2} cy={size / 2} r={r}
+                fill="none" stroke={seg.color}
+                strokeWidth={isHovered ? strokeWidth + 6 : strokeWidth}
+                strokeDasharray={`${dash} ${gap}`}
+                strokeDashoffset={-c * currentOffset + c * 0.25}
+                strokeLinecap="round"
+                className="transition-all duration-300 cursor-pointer"
+                style={{ filter: isHovered ? "brightness(1.1)" : undefined }}
+                onMouseEnter={() => setHover(i)}
+                onMouseLeave={() => setHover(null)}
+              />
+            );
+          })}
+        </svg>
+        {/* Center label — shows hovered segment or total */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+          {hover !== null ? (
+            <>
+              <p className="text-lg font-bold text-[var(--fg)]">{fmt(activeSegments[hover].value)}</p>
+              <p className="text-[10px] text-[var(--fg-muted)]">{activeSegments[hover].label}</p>
+              <p className="text-[10px] font-semibold" style={{ color: activeSegments[hover].color }}>{Math.round(activeSegments[hover].value / total * 100)}%</p>
+            </>
+          ) : (
+            <>
+              <p className="text-lg font-bold text-[var(--fg)]">{fmt(total)}</p>
+              <p className="text-[10px] text-[var(--fg-muted)]">Total</p>
+            </>
+          )}
+        </div>
+      </div>
+      {/* Legend with amounts */}
+      <div className="flex flex-wrap justify-center gap-x-4 gap-y-1.5">
+        {activeSegments.map((seg, i) => (
+          <div
+            key={i}
+            className={`flex items-center gap-1.5 text-[11px] cursor-pointer rounded-md px-1.5 py-0.5 transition-all ${hover === i ? "bg-[var(--warm-glow)] scale-105" : ""}`}
+            onMouseEnter={() => setHover(i)}
+            onMouseLeave={() => setHover(null)}
+          >
+            <div className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: seg.color }} />
             <span className="text-[var(--fg-muted)]">{seg.label}</span>
-            <span className="font-semibold text-[var(--fg)]">{Math.round(seg.value / total * 100)}%</span>
+            <span className="font-bold text-[var(--fg)]">{fmt(seg.value)}</span>
+            <span className="text-[var(--fg-muted)]">({Math.round(seg.value / total * 100)}%)</span>
           </div>
         ))}
       </div>
@@ -153,10 +184,10 @@ export default function CostsPage() {
       {/* ── Donut Chart + Stats ── */}
       <div className="grid gap-4 grid-cols-1 md:grid-cols-[auto_1fr]">
         <Card className="flex items-center justify-center !p-6">
-          <DonutChart segments={[
+          <DonutChart fmt={fmt} segments={[
             { value: fin.totalPaid, color: "#5E8A66", label: t("costs.totalPaid") },
-            { value: fin.remainingToPay - fin.unscheduled, color: "#B8956A", label: t("costs.pendingPayments") },
-            { value: fin.unscheduled, color: "#C4614A", label: t("costs.unscheduled") },
+            { value: Math.max(fin.remainingToPay - fin.unscheduled, 0), color: "#B8956A", label: t("costs.pendingPayments") },
+            { value: Math.max(fin.unscheduled, 0), color: "#C4614A", label: t("costs.unscheduled") },
             { value: Math.max(fin.budgetRemaining, 0), color: "#E8E3DD", label: t("task.budgetRemaining") },
           ]} />
         </Card>

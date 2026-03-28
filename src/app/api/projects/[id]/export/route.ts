@@ -42,6 +42,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       return generateWhatsApp(project, nodes, issues, totalBudget, totalCost, totalPaid, remaining);
     } else if (format === "html") {
       return generateHtml(project, nodes, issues, totalBudget, totalCost, totalPaid, remaining);
+    } else if (format === "infographic") {
+      return generateInfographic(project, nodes, totalBudget, totalCost, totalPaid, remaining);
     }
 
     return new Response("Invalid format", { status: 400 });
@@ -285,5 +287,126 @@ function generateHtml(project: any, nodes: any[], issues: any[], budget: number,
       "Content-Type": "text/html; charset=utf-8",
       "Content-Disposition": `attachment; filename="${project.name.replace(/[^a-zA-Z0-9\u0590-\u05FF ]/g, "_")}_report.html"`,
     },
+  });
+}
+
+function generateInfographic(project: any, nodes: any[], budget: number, cost: number, paid: number, remaining: number) {
+  const pct = cost > 0 ? Math.round((paid / cost) * 100) : 0;
+  const budgetLeft = budget - cost;
+  const milestoned = nodes.flatMap((n) => n.milestones).reduce((s: number, m: any) => s + Number(m.amount), 0);
+  const unscheduled = cost - milestoned;
+  const pending = milestoned - paid;
+
+  // Status counts
+  const completed = nodes.filter((n) => n.status === "COMPLETED").length;
+  const inProgress = nodes.filter((n) => n.status === "IN_PROGRESS").length;
+  const pendingTasks = nodes.filter((n) => !["COMPLETED", "IN_PROGRESS", "CANCELLED"].includes(n.status)).length;
+
+  // Top 5 costliest tasks
+  const topTasks = [...nodes].filter((n) => n.expectedCost).sort((a, b) => Number(b.expectedCost) - Number(a.expectedCost)).slice(0, 5);
+
+  // Donut segments
+  const segments = [
+    { value: paid, color: "#5E8A66", label: "Paid" },
+    { value: Math.max(pending, 0), color: "#B8956A", label: "Pending" },
+    { value: Math.max(unscheduled, 0), color: "#C4614A", label: "Unscheduled" },
+    { value: Math.max(budgetLeft, 0), color: "#E8E3DD", label: "Budget Left" },
+  ].filter(s => s.value > 0);
+  const total = segments.reduce((s, seg) => s + seg.value, 0);
+
+  // SVG donut
+  const cx = 150, cy = 150, r = 100, sw = 40;
+  const circ = Math.PI * 2 * r;
+  let donutPaths = "";
+  let offset = 0;
+  for (const seg of segments) {
+    const segPct = seg.value / total;
+    const dash = circ * segPct;
+    const gap = circ - dash;
+    donutPaths += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${seg.color}" stroke-width="${sw}" stroke-dasharray="${dash} ${gap}" stroke-dashoffset="${-circ * offset + circ * 0.25}" stroke-linecap="round"/>`;
+    offset += segPct;
+  }
+
+  // Legend
+  let legendY = 320;
+  let legendSvg = "";
+  for (const seg of segments) {
+    const segPct = Math.round(seg.value / total * 100);
+    legendSvg += `<circle cx="80" cy="${legendY}" r="5" fill="${seg.color}"/>`;
+    legendSvg += `<text x="92" y="${legendY + 4}" font-size="11" fill="#6B6460" font-family="system-ui">${seg.label}: ${fmtILS(seg.value)} (${segPct}%)</text>`;
+    legendY += 22;
+  }
+
+  // Top tasks
+  let tasksSvg = "";
+  let ty = 80;
+  for (const t of topTasks) {
+    const nc = Number(t.expectedCost);
+    const np = t.milestones.filter((m: any) => m.status === "PAID").reduce((s: number, m: any) => s + Number(m.amount), 0);
+    const tpct = nc > 0 ? Math.round((np / nc) * 100) : 0;
+    const barW = 280 * (tpct / 100);
+    tasksSvg += `<text x="420" y="${ty}" font-size="11" fill="#1A1714" font-family="system-ui" font-weight="600">${t.name.slice(0, 30)}</text>`;
+    tasksSvg += `<rect x="420" y="${ty + 6}" width="280" height="6" rx="3" fill="#E8E3DD"/>`;
+    tasksSvg += `<rect x="420" y="${ty + 6}" width="${barW}" height="6" rx="3" fill="#5E8A66"/>`;
+    tasksSvg += `<text x="710" y="${ty}" font-size="10" fill="#6B6460" font-family="system-ui" text-anchor="end">${fmtILS(np)} / ${fmtILS(nc)} (${tpct}%)</text>`;
+    ty += 36;
+  }
+
+  const date = new Date().toLocaleDateString("he-IL");
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#F5F2EE" rx="16"/>
+
+  <!-- Header -->
+  <text x="60" y="48" font-size="28" font-weight="700" fill="#1A1714" font-family="system-ui">${project.name}</text>
+  <text x="60" y="68" font-size="12" fill="#A39E99" font-family="system-ui">${date} · Reno Tracker</text>
+
+  <!-- Donut -->
+  <g transform="translate(0, 60)">${donutPaths}</g>
+  <text x="${cx}" y="${cy + 55}" font-size="28" font-weight="700" fill="#1A1714" font-family="system-ui" text-anchor="middle">${pct}%</text>
+  <text x="${cx}" y="${cy + 74}" font-size="11" fill="#6B6460" font-family="system-ui" text-anchor="middle">paid</text>
+
+  <!-- Legend -->
+  ${legendSvg}
+
+  <!-- Stats row -->
+  <rect x="340" y="100" width="1" height="400" fill="#E8E3DD"/>
+
+  <text x="420" y="48" font-size="11" font-weight="700" fill="#B8956A" font-family="system-ui" letter-spacing="1.5" text-transform="uppercase">FINANCIAL SUMMARY</text>
+
+  <rect x="380" y="100" width="190" height="70" rx="10" fill="white"/>
+  <text x="395" y="124" font-size="10" fill="#6B6460" font-family="system-ui">Budget</text>
+  <text x="395" y="150" font-size="20" font-weight="700" fill="#1A1714" font-family="system-ui">${fmtILS(budget)}</text>
+
+  <rect x="580" y="100" width="190" height="70" rx="10" fill="white"/>
+  <text x="595" y="124" font-size="10" fill="#6B6460" font-family="system-ui">Paid</text>
+  <text x="595" y="150" font-size="20" font-weight="700" fill="#5E8A66" font-family="system-ui">${fmtILS(paid)}</text>
+
+  <rect x="780" y="100" width="190" height="70" rx="10" fill="white"/>
+  <text x="795" y="124" font-size="10" fill="#6B6460" font-family="system-ui">Remaining</text>
+  <text x="795" y="150" font-size="20" font-weight="700" fill="#C4614A" font-family="system-ui">${fmtILS(remaining)}</text>
+
+  <rect x="980" y="100" width="190" height="70" rx="10" fill="white"/>
+  <text x="995" y="124" font-size="10" fill="#6B6460" font-family="system-ui">Budget Left</text>
+  <text x="995" y="150" font-size="20" font-weight="700" fill="${budgetLeft >= 0 ? '#5E8A66' : '#C4614A'}" font-family="system-ui">${fmtILS(budgetLeft)}</text>
+
+  <!-- Progress bar -->
+  <rect x="380" y="185" width="790" height="8" rx="4" fill="#E8E3DD"/>
+  <rect x="380" y="185" width="${790 * Math.min(pct, 100) / 100}" height="8" rx="4" fill="#5E8A66"/>
+
+  <!-- Task status -->
+  <text x="380" y="220" font-size="10" fill="#6B6460" font-family="system-ui">${completed} completed · ${inProgress} in progress · ${pendingTasks} pending · ${nodes.length} total tasks</text>
+
+  <!-- Top tasks -->
+  <text x="420" y="256" font-size="11" font-weight="700" fill="#B8956A" font-family="system-ui" letter-spacing="1.5">TOP TASKS</text>
+  <g transform="translate(0, 190)">${tasksSvg}</g>
+
+  <!-- Footer -->
+  <line x1="60" y1="600" x2="1140" y2="600" stroke="#E8E3DD"/>
+  <text x="60" y="620" font-size="10" fill="#A39E99" font-family="system-ui">Generated by Reno Tracker · reno-tracker-rho.vercel.app</text>
+</svg>`;
+
+  return new Response(svg, {
+    headers: { "Content-Type": "image/svg+xml", "Cache-Control": "no-cache" },
   });
 }
