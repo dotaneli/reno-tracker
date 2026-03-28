@@ -208,6 +208,7 @@ model Floor {
 
   rooms Room[]
 
+  @@index([projectId])
   @@map("floors")
 }
 
@@ -245,6 +246,7 @@ model Category {
 
   nodes ProjectNode[]
 
+  @@index([projectId])
   @@map("categories")
 }
 
@@ -282,6 +284,8 @@ model ProjectNode {
   notes      Note[]
   issues     Issue[]
 
+  @@index([projectId])
+  @@index([parentId])
   @@map("project_nodes")
 }
 
@@ -341,6 +345,7 @@ model Vendor {
 
   nodes ProjectNode[]
 
+  @@index([projectId])
   @@map("vendors")
 }
 
@@ -359,6 +364,7 @@ model PaymentMilestone {
   nodeId String
   node   ProjectNode @relation(fields: [nodeId], references: [id], onDelete: Cascade)
 
+  @@index([nodeId])
   @@map("payment_milestones")
 }
 
@@ -372,6 +378,7 @@ model Receipt {
   nodeId String
   node   ProjectNode @relation(fields: [nodeId], references: [id], onDelete: Cascade)
 
+  @@index([nodeId])
   @@map("receipts")
 }
 
@@ -386,6 +393,7 @@ model Note {
   authorId String
   author   User @relation(fields: [authorId], references: [id], onDelete: Cascade)
 
+  @@index([nodeId])
   @@map("notes")
 }
 
@@ -400,6 +408,7 @@ model Issue {
   nodeId String
   node   ProjectNode @relation(fields: [nodeId], references: [id], onDelete: Cascade)
 
+  @@index([nodeId])
   @@map("issues")
 }
 

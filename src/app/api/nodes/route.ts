@@ -97,6 +97,15 @@ export async function POST(request: Request) {
       }
     }
 
+    if (body.vendorId) {
+      const vendor = await prisma.vendor.findUnique({ where: { id: body.vendorId }, select: { projectId: true } });
+      if (!vendor || vendor.projectId !== body.projectId) return errorResponse("Invalid vendorId", 400);
+    }
+    if (body.categoryId) {
+      const cat = await prisma.category.findUnique({ where: { id: body.categoryId }, select: { projectId: true } });
+      if (!cat || cat.projectId !== body.projectId) return errorResponse("Invalid categoryId", 400);
+    }
+
     // Guard: if this node has cost and is being created as a root, that's fine.
     // But if it has cost, check it won't become a parent that also has children with cost later — that's handled on update.
 

@@ -108,9 +108,9 @@ export function ItemMilestones({ itemId, expectedCost, onMutate: onParentMutate 
                 <input type="number" placeholder={t("item.amount")} value={editForm.amount} onChange={(e) => setEditForm({ ...editForm, amount: e.target.value })} required className={input} />
                 <input type="date" value={editForm.dueDate} onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })} className={input} />
                 <select value={editForm.status} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })} className={`${input} appearance-none`}>
-                  <option value="PENDING">Pending</option>
-                  <option value="DUE">Due</option>
-                  <option value="PAID">Paid</option>
+                  <option value="PENDING">{t("status.PENDING")}</option>
+                  <option value="DUE">{t("status.DUE")}</option>
+                  <option value="PAID">{t("status.PAID")}</option>
                 </select>
               </div>
               <div className="flex gap-2">

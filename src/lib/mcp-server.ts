@@ -470,6 +470,7 @@ export async function executeTool(toolName: string, args: Record<string, any>, a
       checkProjectScope(auth, node.projectId);
       await requireProjectAccess(userId, node.projectId, ["OWNER", "EDITOR"]);
       const oldMs = await prisma.paymentMilestone.findUnique({ where: { id: milestoneId } });
+      if (!oldMs || oldMs.nodeId !== nodeId) throw new AuthError("Milestone not found on this node", 404);
       const data: any = {};
       if (updates.label !== undefined) data.label = updates.label.trim();
       if (updates.amount !== undefined) data.amount = Number(updates.amount);

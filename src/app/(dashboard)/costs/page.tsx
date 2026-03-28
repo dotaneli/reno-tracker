@@ -14,7 +14,7 @@ import { mutate } from "swr";
 import { Wallet, TrendingUp, AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, PiggyBank, CircleDollarSign, CheckCircle2 } from "lucide-react";
 
 // ── SVG Donut Chart with hover tooltips + data labels ──
-function DonutChart({ segments, size = 200, strokeWidth = 32, fmt }: { segments: { value: number; color: string; label: string }[]; size?: number; strokeWidth?: number; fmt: (n: number) => string }) {
+function DonutChart({ segments, size = 200, strokeWidth = 32, fmt, totalLabel = "Total" }: { segments: { value: number; color: string; label: string }[]; size?: number; strokeWidth?: number; fmt: (n: number) => string; totalLabel?: string }) {
   const [hover, setHover] = useState<number | null>(null);
   const total = segments.reduce((s, seg) => s + seg.value, 0);
   if (total === 0) return null;
@@ -43,7 +43,7 @@ function DonutChart({ segments, size = 200, strokeWidth = 32, fmt }: { segments:
                 strokeWidth={isHovered ? strokeWidth + 6 : strokeWidth}
                 strokeDasharray={`${dash} ${gap}`}
                 strokeDashoffset={-c * currentOffset + c * 0.25}
-                strokeLinecap="round"
+                strokeLinecap="butt"
                 className="transition-all duration-300 cursor-pointer"
                 style={{ filter: isHovered ? "brightness(1.1)" : undefined }}
                 onMouseEnter={() => setHover(i)}
@@ -63,7 +63,7 @@ function DonutChart({ segments, size = 200, strokeWidth = 32, fmt }: { segments:
           ) : (
             <>
               <p className="text-lg font-bold text-[var(--fg)]">{fmt(total)}</p>
-              <p className="text-[10px] text-[var(--fg-muted)]">Total</p>
+              <p className="text-[10px] text-[var(--fg-muted)]">{totalLabel}</p>
             </>
           )}
         </div>
@@ -93,32 +93,17 @@ export default function CostsPage() {
   const [calMonth, setCalMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
 
   const { data: allNodes } = useApi<any[]>(project ? `/api/nodes?projectId=${project.id}` : null);
-  const { data: rootNodes } = useApi<any[]>(project ? `/api/nodes?projectId=${project.id}&parentId=root` : null);
   const fin = useFinancials(project?.id);
 
   const allTexts = useMemo(() => [...(allNodes?.map((n: any) => n.name) || [])], [allNodes]);
   const tr = useTranslate(allTexts);
   const fmt = (n: number) => new Intl.NumberFormat(lang === "he" ? "he-IL" : "en-IL", { style: "currency", currency: "ILS", maximumFractionDigits: 0 }).format(n);
 
-  const mutateAll = () => { mutate(`/api/nodes?projectId=${project?.id}`); mutate(`/api/nodes?projectId=${project?.id}&parentId=root`); mutate(`/api/projects/${project?.id}/milestones`); mutate(`/api/projects`); };
+  const mutateAll = () => { mutate(`/api/nodes?projectId=${project?.id}`); mutate(`/api/projects/${project?.id}/milestones`); mutate(`/api/projects`); };
 
   const ms = fin.milestones;
   const costNodes = allNodes?.filter((n: any) => n.expectedCost) || [];
   const upcomingMilestones = fin.unpaidMilestones.filter((m: any) => m.dueDate).sort((a: any, b: any) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
-
-  const nodeBreakdown = useMemo(() => {
-    if (!rootNodes || !allNodes || !ms.length) return [];
-    return rootNodes.map((root: any) => {
-      const descIds = new Set<string>();
-      const collect = (id: string) => { descIds.add(id); allNodes.filter((n: any) => n.parentId === id).forEach((n: any) => collect(n.id)); };
-      collect(root.id);
-      const nodeMilestones = ms.filter((m: any) => descIds.has(m.nodeId));
-      const childNodes = allNodes.filter((n: any) => descIds.has(n.id) && n.expectedCost);
-      const expected = childNodes.reduce((s: number, n: any) => s + Number(n.expectedCost), 0);
-      const paid = nodeMilestones.filter((m: any) => m.status === "PAID").reduce((s: number, m: any) => s + Number(m.amount), 0);
-      return { id: root.id, name: root.name, type: root.nodeType, expected, paid, pct: expected > 0 ? (paid / expected) * 100 : 0, milestones: nodeMilestones, nodes: childNodes };
-    }).filter((n) => n.expected > 0);
-  }, [rootNodes, allNodes, ms]);
 
   // Unpaid deepdive computation
   const unpaidData = useMemo(() => {
@@ -183,7 +168,7 @@ export default function CostsPage() {
       {/* ── Donut Chart + Stats ── */}
       <div className="grid gap-4 grid-cols-1 md:grid-cols-[auto_1fr]">
         <Card className="flex items-center justify-center !p-6">
-          <DonutChart fmt={fmt} segments={[
+          <DonutChart fmt={fmt} totalLabel={t("costs.totalCost")} segments={[
             { value: fin.totalPaid, color: "#5E8A66", label: t("costs.totalPaid") },
             { value: Math.max(fin.remainingToPay - fin.unscheduled, 0), color: "#B8956A", label: t("costs.pendingPayments") },
             { value: Math.max(fin.unscheduled, 0), color: "#C4614A", label: t("costs.unscheduled") },
@@ -229,7 +214,7 @@ export default function CostsPage() {
             </div>
           </StatCard>
 
-          <StatCard label={t("dash.openIssues")} value={fin.overdueMilestones.length} accent={fin.overdueMilestones.length > 0} icon={<AlertTriangle size={18} />}>
+          <StatCard label={t("costs.overdue")} value={fin.overdueMilestones.length} accent={fin.overdueMilestones.length > 0} icon={<AlertTriangle size={18} />}>
             <div className="max-h-32 overflow-y-auto space-y-0.5">
               {fin.overdueMilestones.length === 0 ? <p className="text-xs text-[var(--fg-muted)]">—</p> :
                 fin.overdueMilestones.map((m: any) => <MilestoneLine key={m.id} m={m} tr={tr} />)}
@@ -266,10 +251,13 @@ export default function CostsPage() {
               <p className="text-sm font-medium text-[var(--success)]">{t("costs.noUnpaid")}</p>
             </div>
           </Card>
-        ) : (
-          <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
+        ) : (() => {
+          const activeCols = [unpaidData.pendingGroups.length > 0, unpaidData.gapGroups.length > 0, unpaidData.noPaymentTasks.length > 0].filter(Boolean).length;
+          const gridClass = activeCols === 1 ? "space-y-2" : activeCols === 2 ? "grid gap-4 grid-cols-1 md:grid-cols-2" : "grid gap-4 grid-cols-1 md:grid-cols-3";
+          return (
+          <div className={gridClass}>
             {/* Column 1: Pending Payments */}
-            <div className="space-y-2">
+            {unpaidData.pendingGroups.length > 0 && <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent)]">{t("costs.pendingPayments")}</p>
                 {unpaidData.pendingTotal > 0 && <span className="text-[10px] font-bold text-[var(--accent)]">{fmt(unpaidData.pendingTotal)}</span>}
@@ -288,17 +276,15 @@ export default function CostsPage() {
                   </Card>
                 );
               })}
-            </div>
+            </div>}
 
             {/* Column 2: Partially Scheduled (gap only) */}
-            <div className="space-y-2">
+            {unpaidData.gapGroups.length > 0 && <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-amber-600">{t("costs.gapPayments")}</p>
-                {unpaidData.gapTotal > 0 && <span className="text-[10px] font-bold text-amber-600">{fmt(unpaidData.gapTotal)}</span>}
+                <span className="text-[10px] font-bold text-amber-600">{fmt(unpaidData.gapTotal)}</span>
               </div>
-              {unpaidData.gapGroups.length === 0 ? (
-                <p className="text-xs text-[var(--fg-muted)] py-2">—</p>
-              ) : unpaidData.gapGroups.map((g) => (
+              {unpaidData.gapGroups.map((g) => (
                 <Card key={g.nodeId} className="!p-2">
                   {g.node ? <TaskLine node={g.node} tr={tr} compact onMutate={mutateAll} /> : (
                     <div className="flex items-center justify-between gap-2 px-2 py-1.5">
@@ -308,58 +294,26 @@ export default function CostsPage() {
                   )}
                 </Card>
               ))}
-            </div>
+            </div>}
 
             {/* Column 3: No Payments Scheduled */}
-            <div className="space-y-2">
+            {unpaidData.noPaymentTasks.length > 0 && <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--alert)]">{t("costs.unscheduledTasks")}</p>
-                {unpaidData.noPaymentTotal > 0 && <span className="text-[10px] font-bold text-[var(--alert)]">{fmt(unpaidData.noPaymentTotal)}</span>}
+                <span className="text-[10px] font-bold text-[var(--alert)]">{fmt(unpaidData.noPaymentTotal)}</span>
               </div>
-              {unpaidData.noPaymentTasks.length === 0 ? (
-                <p className="text-xs text-[var(--fg-muted)] py-2">—</p>
-              ) : unpaidData.noPaymentTasks.map((n: any) => (
+              {unpaidData.noPaymentTasks.map((n: any) => (
                 <Card key={n.id} className="!p-2">
                   <TaskLine node={n} tr={tr} compact onMutate={mutateAll} />
                 </Card>
               ))}
-            </div>
+            </div>}
           </div>
-        )}
+          );
+        })()}
       </div>
 
-      {/* Per task group — expandable */}
-      {nodeBreakdown.length > 0 && (
-        <div>
-          <h2 className="mb-3 text-xs font-bold uppercase tracking-[0.15em] text-[var(--fg-muted)]">{t("costs.byTask")}</h2>
-          <div className="space-y-2">
-            {nodeBreakdown.map((sp) => (
-              <Card key={sp.id}>
-                <Expandable trigger={
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2"><p className="text-sm font-semibold text-[var(--fg)]">{tr(sp.name)}</p>{sp.type && <span className="rounded-lg bg-[var(--accent-soft)] px-2 py-0.5 text-[10px] font-bold uppercase text-[var(--accent)]">{t(`type.${sp.type}` as TKey)}</span>}</div>
-                      <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-[var(--border-subtle)]"><div className="h-full rounded-full bg-[var(--accent)]" style={{ width: `${Math.min(sp.pct, 100)}%` }} /></div>
-                    </div>
-                    <div className="shrink-0 text-end"><p className="text-sm font-bold text-[var(--fg)]">{fmt(sp.paid)}</p><p className="text-[11px] text-[var(--fg-muted)]">{t("costs.paidOf")} {fmt(sp.expected)}</p></div>
-                  </div>
-                }>
-                  <div className="space-y-2">
-                    <div className="rounded-lg bg-[var(--bg)] p-2">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--fg-muted)] mb-1">{t("dash.tasks")}</p>
-                      {sp.nodes.map((n: any) => <TaskLine key={n.id} node={n} tr={tr} compact onMutate={mutateAll} />)}
-                    </div>
-                    <div className="rounded-lg bg-[var(--bg)] p-2">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--fg-muted)] mb-1">{t("task.milestones")}</p>
-                      {sp.milestones.map((m: any) => <MilestoneLine key={m.id} m={m} tr={tr} />)}
-                    </div>
-                  </div>
-                </Expandable>
-              </Card>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* "By Task" section removed — redundant with unpaid deepdive + donut + stat cards */}
 
       {/* Overdue */}
       {fin.overdueMilestones.length > 0 && (

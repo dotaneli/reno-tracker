@@ -9,6 +9,7 @@ import { Card, StatCard } from "@/components/Card";
 import { Expandable } from "@/components/Expandable";
 import { TaskLine, MilestoneLine } from "@/components/TaskLine";
 import { StatusBadge } from "@/components/StatusBadge";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { mutate } from "swr";
 import { AlertTriangle, Wallet, Layers, Package, TrendingUp, CalendarDays, ArrowUpRight, PiggyBank } from "lucide-react";
@@ -122,7 +123,7 @@ export default function DashboardPage() {
         <StatCard label={t("dash.tasks")} value={leafNodes.length} icon={<Package size={18} />}>
           <div className="max-h-48 overflow-y-auto space-y-0.5">
             {leafNodes.slice(0, 15).map((n: any) => <TaskLine key={n.id} node={n} tr={tr} compact onMutate={mutateAll} />)}
-            {leafNodes.length > 15 && <p className="text-xs text-[var(--fg-muted)] pt-1">{leafNodes.length - 15} more...</p>}
+            {leafNodes.length > 15 && <Link href="/tasks" className="text-xs text-[var(--accent)] font-medium hover:underline pt-1">{leafNodes.length - 15} {t("general.more")}</Link>}
           </div>
         </StatCard>
       </div>

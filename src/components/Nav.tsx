@@ -178,7 +178,7 @@ export function Nav() {
               <Copy size={13} className="text-[var(--accent)]" />
               {done === "copy" ? <><Check size={11} className="text-[var(--success)]" /></> : loading === "image" ? "..." : t("export.png")}
             </button>
-            <button onClick={() => generateInfographic("download")} disabled={!!loading} className="rounded-lg p-1.5 text-[var(--fg-muted)]/30 transition-all hover:bg-[var(--warm-glow)] hover:text-[var(--fg)] disabled:opacity-40" title="Download">
+            <button onClick={() => generateInfographic("download")} disabled={!!loading} className="rounded-lg p-1.5 text-[var(--fg-muted)]/30 transition-all hover:bg-[var(--warm-glow)] hover:text-[var(--fg)] disabled:opacity-40">
               {done === "download" ? <Check size={13} className="text-[var(--success)]" /> : <Download size={13} />}
             </button>
           </div>

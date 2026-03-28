@@ -59,8 +59,8 @@ export default function ProjectsPage() {
             <input type="text" placeholder={t("proj.name")} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required className={input} />
             <div className="grid grid-cols-3 gap-3">
               <input type="number" placeholder={`${t("proj.budget")} (₪)`} value={form.totalBudget} onChange={(e) => setForm({ ...form, totalBudget: e.target.value })} required className={input} />
-              <input type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} className={input} placeholder="Start" />
-              <input type="date" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} className={input} placeholder="End" />
+              <input type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} className={input} placeholder={t("proj.startDate")} />
+              <input type="date" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} className={input} placeholder={t("proj.endDate")} />
             </div>
             {error && <p className="text-xs font-medium text-[var(--alert)]">{error}</p>}
             <button type="submit" className="w-full rounded-xl bg-[var(--accent)] py-3 text-sm font-semibold text-white shadow-md shadow-[var(--accent)]/20">{t("task.save")}</button>

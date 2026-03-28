@@ -49,6 +49,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       }
     }
 
+    // Validate vendorId/categoryId belong to the same project
+    if (body.vendorId) {
+      const vendor = await prisma.vendor.findUnique({ where: { id: body.vendorId }, select: { projectId: true } });
+      if (!vendor || vendor.projectId !== projectId) return errorResponse("Invalid vendorId", 400);
+    }
+    if (body.categoryId) {
+      const cat = await prisma.category.findUnique({ where: { id: body.categoryId }, select: { projectId: true } });
+      if (!cat || cat.projectId !== projectId) return errorResponse("Invalid categoryId", 400);
+    }
+
     // Guard: prevent double-counting — no cost on nodes with costed children (or vice versa)
     if (body.expectedCost !== undefined && body.expectedCost !== null) {
       // Check if this node has children with costs

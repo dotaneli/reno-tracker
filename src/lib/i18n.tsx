@@ -58,9 +58,11 @@ const dict = {
   "proj.active": { en: "Active", he: "פעיל" },
   "proj.switch": { en: "Switch", he: "עבור" },
   "proj.noProjects": { en: "No projects yet. Create your first one.", he: "אין פרויקטים עדיין. צור את הראשון." },
+  "proj.startDate": { en: "Start date", he: "תאריך התחלה" },
+  "proj.endDate": { en: "End date", he: "תאריך סיום" },
 
   // ── Dashboard ──
-  "dash.welcome": { en: "Welcome back", he: "ברוך שובך" },
+  "dash.welcome": { en: "Welcome back", he: "שמחים שחזרת" },
   "dash.budget": { en: "Total Budget", he: "תקציב כולל" },
   "dash.spent": { en: "Total Spent", he: "סה״כ הוצאות" },
   "dash.remaining": { en: "Remaining", he: "נותר" },
@@ -339,6 +341,7 @@ const dict = {
   "general.error": { en: "Something went wrong", he: "משהו השתבש" },
   "general.noProject": { en: "No project found", he: "לא נמצא פרויקט" },
   "general.currency": { en: "ILS", he: "₪" },
+  "general.more": { en: "more \u2192", he: "\u05E2\u05D5\u05D3 \u2192" },
 
   // ── Settings ──
   "settings.title": { en: "Settings", he: "הגדרות" },
