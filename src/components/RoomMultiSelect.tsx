@@ -36,13 +36,13 @@ export function RoomMultiSelect({ value, onChange, floors, tr }: RoomMultiSelect
         </div>
       )}
       {/* Dropdown to add */}
-      {available.length > 0 && (
+      {available.length > 0 ? (
         <select
           value=""
           onChange={(e) => { if (e.target.value) add(e.target.value); }}
           className="w-full appearance-none rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)] outline-none focus:border-[var(--accent)]"
         >
-          <option value="">{t("task.rooms")}...</option>
+          <option value="">{t("task.addRoom")}</option>
           {floors.map((f) => {
             const fRooms = f.rooms.filter((r) => !value.includes(r.id));
             if (fRooms.length === 0) return null;
@@ -55,7 +55,9 @@ export function RoomMultiSelect({ value, onChange, floors, tr }: RoomMultiSelect
             );
           })}
         </select>
-      )}
+      ) : selected.length > 0 ? (
+        <p className="text-[10px] text-[var(--success)]">{t("task.allRooms")}</p>
+      ) : null}
     </div>
   );
 }

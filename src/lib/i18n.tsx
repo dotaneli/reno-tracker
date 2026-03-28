@@ -173,6 +173,12 @@ const dict = {
   "task.budgetRemaining": { en: "Budget Remaining", he: "תקציב שנותר" },
   "task.noCost": { en: "No cost set", he: "לא הוגדרה עלות" },
   "task.ofBudget": { en: "of budget", he: "מתוך התקציב" },
+  "task.subTasks": { en: "sub-tasks", he: "תת-משימות" },
+  "task.noMatch": { en: "No tasks found", he: "לא נמצאו משימות" },
+  "task.addRoom": { en: "Add a room...", he: "הוסף חדר..." },
+  "task.allRooms": { en: "All rooms assigned", he: "כל החדרים שויכו" },
+  "costs.unscheduled": { en: "Unscheduled", he: "לא מתוכנן" },
+  "prop.selectFloor": { en: "Select floor", he: "בחר קומה" },
 
   // ── Categories ──
   "cat.title": { en: "Categories", he: "קטגוריות" },

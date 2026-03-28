@@ -93,7 +93,7 @@ export default function VendorsPage() {
               <input type="email" placeholder={t("vendor.email")} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={input} />
             </div>
             {error && <p className="text-xs font-medium text-[var(--alert)]">{error}</p>}
-            <button type="submit" className="w-full rounded-xl bg-[var(--accent)] py-3 text-sm font-semibold text-white shadow-md shadow-[var(--accent)]/20">{editId ? t("crud.edit") : t("task.save")}</button>
+            <button type="submit" className="w-full rounded-xl bg-[var(--accent)] py-3 text-sm font-semibold text-white shadow-md shadow-[var(--accent)]/20">{t("task.save")}</button>
           </form>
         </Card>
       )}

@@ -44,7 +44,9 @@ export default function PropertyPage() {
 
   const deleteFloor = async (f: any) => {
     if (!confirm(t("prop.deleteFloorConfirm").replace("{name}", f.name))) return;
-    await fetch(`/api/floors`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ floorId: f.id }) }).catch(() => {});
+    try {
+      await apiDelete(`/api/floors`, { floorId: f.id });
+    } catch (err: any) { setError(err.message); }
     mutateFloors();
   };
 
@@ -120,7 +122,7 @@ export default function PropertyPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="relative">
                 <select value={roomForm.floorId} onChange={(e) => setRoomForm({ ...roomForm, floorId: e.target.value })} required className={select}>
-                  <option value="">{t("prop.floors")}</option>
+                  <option value="">{t("prop.selectFloor")}</option>
                   {floors.map((f: any) => <option key={f.id} value={f.id}>{tr(f.name)}</option>)}
                 </select>
                 <ChevronDown size={14} className="pointer-events-none absolute end-3.5 top-1/2 -translate-y-1/2 text-[var(--fg-muted)]" />

@@ -64,7 +64,7 @@ export default function DashboardPage() {
             <div className="space-y-1">
               <div className="flex justify-between"><span className="text-[var(--fg-muted)]">{t("costs.totalCost")}</span><span className="font-semibold">{fmt(fin.totalCost)}</span></div>
               <div className="flex justify-between"><span className="text-[var(--fg-muted)]">{t("costs.totalPaid")}</span><span className="font-semibold text-[var(--success)]">-{fmt(fin.totalPaid)}</span></div>
-              {fin.unscheduled > 0 && <div className="flex justify-between"><span className="text-[var(--fg-muted)]">Not yet scheduled</span><span className="font-semibold text-[var(--alert)]">{fmt(fin.unscheduled)}</span></div>}
+              {fin.unscheduled > 0 && <div className="flex justify-between"><span className="text-[var(--fg-muted)]">{t("costs.unscheduled")}</span><span className="font-semibold text-[var(--alert)]">{fmt(fin.unscheduled)}</span></div>}
             </div>
             {fin.unpaidMilestones.length > 0 && (
               <div className="max-h-28 overflow-y-auto border-t border-[var(--border-subtle)] pt-1.5 space-y-0.5">

@@ -83,7 +83,7 @@ export default function CategoriesPage() {
         <Card glow>
           <form onSubmit={handleSubmit} className="flex gap-3">
             <input type="text" placeholder={t("cat.name")} value={form.name} onChange={(e) => setForm({ name: e.target.value })} required className={`${input} flex-1`} />
-            <button type="submit" className="shrink-0 rounded-xl bg-[var(--accent)] px-6 py-3 text-sm font-semibold text-white">{editId ? t("crud.edit") : t("task.save")}</button>
+            <button type="submit" className="shrink-0 rounded-xl bg-[var(--accent)] px-6 py-3 text-sm font-semibold text-white">{t("task.save")}</button>
           </form>
           {error && <p className="mt-2 text-xs font-medium text-[var(--alert)]">{error}</p>}
         </Card>

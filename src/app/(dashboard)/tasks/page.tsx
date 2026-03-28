@@ -110,6 +110,7 @@ export default function TasksPage() {
   const [addForm, setAddForm] = useState({ name: "", categoryId: "", vendorId: "", expectedCost: "", expectedDate: "", roomIds: [] as string[] });
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault(); setError("");
+    if (!project) return;
     try {
       const data: any = { name: addForm.name, projectId: project.id };
       if (addForm.categoryId) data.categoryId = addForm.categoryId;
@@ -131,6 +132,7 @@ export default function TasksPage() {
   const resetEdit = () => { setEditForm({ name: "", parentId: "", vendorId: "", categoryId: "", expectedCost: "", expectedDate: "", status: "PENDING", roomIds: [] }); setEditNodeId(null); setShowEditForm(false); };
   const handleEdit = async (e: React.FormEvent) => {
     e.preventDefault(); setError("");
+    if (!project) return;
     try {
       await apiPatch(`/api/nodes/${editNodeId}`, { name: editForm.name, parentId: editForm.parentId || null, vendorId: editForm.vendorId || null, categoryId: editForm.categoryId || null, expectedCost: editForm.expectedCost ? Number(editForm.expectedCost) : null, expectedDate: editForm.expectedDate || null, status: editForm.status, roomIds: editForm.roomIds });
       resetEdit(); mutateAll();
@@ -179,7 +181,7 @@ export default function TasksPage() {
             <>
               <div className="h-4 w-px bg-white/20 hidden sm:block" />
               <div className="flex items-center gap-1.5 text-xs">
-                <span className="opacity-70">Unscheduled</span>
+                <span className="opacity-70">{t("costs.unscheduled")}</span>
                 <span className="font-bold text-red-400">{fmt(fin.unscheduled)}</span>
               </div>
             </>
@@ -336,7 +338,7 @@ export default function TasksPage() {
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {filteredNodes.length === 0 ? (
             <div className="col-span-full py-12 text-center text-sm text-[var(--fg-muted)]">
-              {searchQuery ? `No tasks matching "${searchQuery}"` : t("task.noTasks")}
+              {t("task.noMatch")}
             </div>
           ) : filteredNodes.map((node: any) => (
             <TaskCard key={node.id} node={node} tr={tr} fmt={fmt} t={t} onEdit={() => startEdit(node)} />
@@ -350,11 +352,11 @@ export default function TasksPage() {
 // ── Task Card Component ──
 
 function TaskCard({ node, tr, fmt, t, onEdit }: { node: any; tr: (s: string) => string; fmt: (n: number) => string; t: (key: TKey) => string; onEdit: () => void }) {
+  const { lang } = useI18n();
   const cost = Number(node.expectedCost || 0);
   const paid = Number(node._paid || 0);
-  const total = Number(node._totalMilestoned || 0);
-  const remaining = total - paid;
-  const pct = total > 0 ? Math.round((paid / total) * 100) : 0;
+  const remaining = cost - paid;
+  const pct = cost > 0 ? Math.round((paid / cost) * 100) : 0;
 
   return (
     <div
@@ -389,10 +391,22 @@ function TaskCard({ node, tr, fmt, t, onEdit }: { node: any; tr: (s: string) => 
         )}
         {node._count?.children > 0 && (
           <span className="rounded-lg bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-600">
-            {node._count.children} sub-tasks
+            {node._count.children} {t("task.subTasks")}
           </span>
         )}
+        {node.rooms?.map((r: any) => (
+          <span key={r.roomId} className="rounded-lg bg-[var(--border-subtle)] px-2 py-0.5 text-[10px] font-medium text-[var(--fg-muted)]">
+            {r.room?.name || ""}
+          </span>
+        ))}
       </div>
+
+      {/* Expected date */}
+      {node.expectedDate && (
+        <p className="mb-2 text-[10px] text-[var(--fg-muted)]">
+          {new Date(node.expectedDate).toLocaleDateString(lang === "he" ? "he-IL" : "en-IL", { day: "numeric", month: "short", year: "numeric" })}
+        </p>
+      )}
 
       {/* Cost section */}
       {cost > 0 ? (

@@ -89,7 +89,7 @@ export default function CostsPage() {
             <div className="space-y-1">
               <div className="flex justify-between"><span className="text-[var(--fg-muted)]">{t("costs.totalCost")}</span><span className="font-semibold">{fmt(fin.totalCost)}</span></div>
               <div className="flex justify-between"><span className="text-[var(--fg-muted)]">{t("costs.totalPaid")}</span><span className="font-semibold text-[var(--success)]">-{fmt(fin.totalPaid)}</span></div>
-              {fin.unscheduled > 0 && <div className="flex justify-between"><span className="text-[var(--fg-muted)]">Not yet scheduled</span><span className="font-semibold text-[var(--alert)]">{fmt(fin.unscheduled)}</span></div>}
+              {fin.unscheduled > 0 && <div className="flex justify-between"><span className="text-[var(--fg-muted)]">{t("costs.unscheduled")}</span><span className="font-semibold text-[var(--alert)]">{fmt(fin.unscheduled)}</span></div>}
             </div>
             {fin.unpaidMilestones.length > 0 && (
               <div className="max-h-28 overflow-y-auto border-t border-[var(--border-subtle)] pt-1.5 space-y-0.5">
@@ -104,7 +104,7 @@ export default function CostsPage() {
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--border-subtle)]">
               <div className={`h-full rounded-full ${fin.budgetRemaining >= 0 ? "bg-[var(--success)]" : "bg-[var(--alert)]"}`} style={{ width: `${Math.min(fin.costPct, 100)}%` }} />
             </div>
-            <p className="text-center text-[10px] text-[var(--fg-muted)]">{fin.costPct}% of budget allocated</p>
+            <p className="text-center text-[10px] text-[var(--fg-muted)]">{fin.costPct}% {t("task.ofBudget")}</p>
           </div>
         </StatCard>
       </div>
