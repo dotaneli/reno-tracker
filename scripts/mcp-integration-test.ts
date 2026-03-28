@@ -155,20 +155,33 @@ async function testListProjects() {
 async function testCreateNode() {
   console.log("\n➕ create_node");
 
-  // Root node
-  const node = await mcpTool("create_node", { projectId: PROJECT_ID, name: "Kitchen Renovation", expectedCost: 25000 });
-  assert(!node._error, "create root node succeeds");
+  // Root node (grouping — no cost, like real data)
+  const node = await mcpTool("create_node", { projectId: PROJECT_ID, name: "Kitchen Renovation" });
+  assert(!node._error, "create root group node succeeds");
   assert(node.name === "Kitchen Renovation", "correct name");
-  assert(Number(node.expectedCost) === 25000, `correct cost (got ${node.expectedCost})`);
   assert(node.projectId === PROJECT_ID, "correct project");
   assert(node.parentId === null, "root node has null parentId");
   NODE_ID = node.id;
 
-  // Child node
-  const child = await mcpTool("create_node", { projectId: PROJECT_ID, name: "Install Faucet", parentId: NODE_ID, expectedCost: 2000 });
-  assert(!child._error, "create child node succeeds");
+  // Child node with cost (leaf)
+  const child = await mcpTool("create_node", { projectId: PROJECT_ID, name: "Install Faucet", parentId: NODE_ID, expectedCost: 30000 });
+  assert(!child._error, "create child node with cost succeeds");
   assert(child.parentId === NODE_ID, "child has correct parentId");
+  assert(Number(child.expectedCost) === 30000, `correct cost (got ${child.expectedCost})`);
   CHILD_NODE_ID = child.id;
+
+  // Second child
+  const child2 = await mcpTool("create_node", { projectId: PROJECT_ID, name: "Tile Backsplash", parentId: NODE_ID, expectedCost: 2000 });
+  assert(!child2._error, "create second child succeeds");
+
+  // Guard: reject cost on parent that has costed children
+  const guardParent = await mcpTool("update_node", { nodeId: NODE_ID, expectedCost: 50000 });
+  assert(!!guardParent._error, "guard: cannot set cost on parent with costed children");
+
+  // Guard: reject cost on child when parent has cost (create a standalone node with cost, then try to add child with cost)
+  const standalone = await mcpTool("create_node", { projectId: PROJECT_ID, name: "Standalone Task", expectedCost: 5000 });
+  const guardChild = await mcpTool("create_node", { projectId: PROJECT_ID, name: "Sub under standalone", parentId: standalone.id, expectedCost: 1000 });
+  assert(!!guardChild._error, "guard: cannot set cost on child when parent has cost");
 
   // Validation: missing name
   const noName = await mcpTool("create_node", { projectId: PROJECT_ID, name: "" });
@@ -178,11 +191,16 @@ async function testCreateNode() {
 async function testUpdateNode() {
   console.log("\n✏️ update_node");
 
-  const updated = await mcpTool("update_node", { nodeId: NODE_ID, name: "Kitchen Full Reno", status: "IN_PROGRESS", expectedCost: 30000 });
-  assert(!updated._error, "update succeeds");
+  // Update the root group name/status (no cost — it's a group)
+  const updated = await mcpTool("update_node", { nodeId: NODE_ID, name: "Kitchen Full Reno", status: "IN_PROGRESS" });
+  assert(!updated._error, "update group succeeds");
   assert(updated.name === "Kitchen Full Reno", "name updated");
   assert(updated.status === "IN_PROGRESS", "status updated");
-  assert(Number(updated.expectedCost) === 30000, "cost updated");
+
+  // Update child's cost
+  const updatedChild = await mcpTool("update_node", { nodeId: CHILD_NODE_ID, expectedCost: 30000 });
+  assert(!updatedChild._error, "update child cost succeeds");
+  assert(Number(updatedChild.expectedCost) === 30000, "child cost updated");
 }
 
 async function testGetProjectTree() {
@@ -190,10 +208,12 @@ async function testGetProjectTree() {
 
   const tree = await mcpTool("get_project_tree", { projectId: PROJECT_ID });
   assert(Array.isArray(tree), "returns array");
-  assert(tree.length === 1, `1 root node (got ${tree.length})`);
-  assert(tree[0].name === "Kitchen Full Reno", "root name correct");
-  assert(tree[0].children?.length === 1, "root has 1 child");
-  assert(tree[0].children[0].name === "Install Faucet", "child name correct");
+  // 2 roots: "Kitchen Full Reno" group + "Standalone Task" leaf
+  const kitchen = tree.find((n: any) => n.name === "Kitchen Full Reno");
+  assert(!!kitchen, "kitchen group in tree");
+  assert(kitchen.children?.length === 2, `kitchen has 2 children (got ${kitchen?.children?.length})`);
+  assert(kitchen.children.some((c: any) => c.name === "Install Faucet"), "Install Faucet child found");
+  assert(kitchen.children.some((c: any) => c.name === "Tile Backsplash"), "Tile Backsplash child found");
 }
 
 async function testCreateVendor() {
@@ -231,16 +251,16 @@ async function testListCategories() {
 async function testCreateMilestone() {
   console.log("\n💰 create_milestone");
 
-  // Fixed amount
-  const ms = await mcpTool("create_milestone", { nodeId: NODE_ID, label: "Deposit", amount: 5000, dueDate: "2026-04-15" });
+  // Fixed amount (on CHILD_NODE_ID which has expectedCost=30000)
+  const ms = await mcpTool("create_milestone", { nodeId: CHILD_NODE_ID, label: "Deposit", amount: 5000, dueDate: "2026-04-15" });
   assert(!ms._error, "create milestone succeeds");
   assert(ms.label === "Deposit", "correct label");
   assert(Number(ms.amount) === 5000, `correct amount (got ${ms.amount})`);
-  assert(ms.nodeId === NODE_ID, "correct nodeId");
+  assert(ms.nodeId === CHILD_NODE_ID, "correct nodeId");
   MILESTONE_ID = ms.id;
 
   // Percentage-based (node has expectedCost = 30000)
-  const msPct = await mcpTool("create_milestone", { nodeId: NODE_ID, label: "50% Complete", percentage: 50 });
+  const msPct = await mcpTool("create_milestone", { nodeId: CHILD_NODE_ID, label: "50% Complete", percentage: 50 });
   assert(!msPct._error, "percentage milestone succeeds");
   assert(Number(msPct.amount) === 15000, `50% of 30000 = 15000 (got ${msPct.amount})`);
 }
@@ -248,7 +268,7 @@ async function testCreateMilestone() {
 async function testUpdateMilestone() {
   console.log("\n✏️ update_milestone");
 
-  const updated = await mcpTool("update_milestone", { nodeId: NODE_ID, milestoneId: MILESTONE_ID, status: "PAID", paidDate: "2026-03-28" });
+  const updated = await mcpTool("update_milestone", { nodeId: CHILD_NODE_ID, milestoneId: MILESTONE_ID, status: "PAID", paidDate: "2026-03-28" });
   assert(!updated._error, "update milestone succeeds");
   assert(updated.status === "PAID", "status set to PAID");
   assert(updated.paidDate !== null, "paidDate set");
@@ -257,7 +277,7 @@ async function testUpdateMilestone() {
 async function testCreateIssue() {
   console.log("\n⚠️ create_issue");
 
-  const issue = await mcpTool("create_issue", { nodeId: NODE_ID, title: "Pipe leak under sink", description: "Found during inspection" });
+  const issue = await mcpTool("create_issue", { nodeId: CHILD_NODE_ID, title: "Pipe leak under sink", description: "Found during inspection" });
   assert(!issue._error, "create issue succeeds");
   assert(issue.title === "Pipe leak under sink", "correct title");
   assert(issue.status === "OPEN", "default status is OPEN");
@@ -289,12 +309,13 @@ async function testGetFinancialSummary() {
   const fin = await mcpTool("get_financial_summary", { projectId: PROJECT_ID });
   assert(!fin._error, "returns financial summary");
   assert(fin.totalBudget === 100000, `correct budget (got ${fin.totalBudget})`);
-  assert(fin.totalCost === 32000, `total cost = 30000 + 2000 = 32000 (got ${fin.totalCost})`);
+  // Costs: Install Faucet (30000) + Tile Backsplash (2000) + Standalone Task (5000) = 37000
+  assert(fin.totalCost === 37000, `total cost = 30000 + 2000 + 5000 = 37000 (got ${fin.totalCost})`);
   assert(fin.totalPaid === 5000, `paid = 5000 deposit (got ${fin.totalPaid})`);
   assert(fin.totalMilestoned === 20000, `milestoned = 5000 + 15000 = 20000 (got ${fin.totalMilestoned})`);
-  assert(fin.remainingToPay === 27000, `remaining to pay = 32000 - 5000 = 27000 (got ${fin.remainingToPay})`);
-  assert(fin.unscheduled === 12000, `unscheduled = 32000 - 20000 = 12000 (got ${fin.unscheduled})`);
-  assert(fin.budgetRemaining === 68000, `budget remaining = 100000 - 32000 = 68000 (got ${fin.budgetRemaining})`);
+  assert(fin.remainingToPay === 32000, `remaining to pay = 37000 - 5000 = 32000 (got ${fin.remainingToPay})`);
+  assert(fin.unscheduled === 17000, `unscheduled = 37000 - 20000 = 17000 (got ${fin.unscheduled})`);
+  assert(fin.budgetRemaining === 63000, `budget remaining = 100000 - 37000 = 63000 (got ${fin.budgetRemaining})`);
 }
 
 async function testMarkNodeDone() {
@@ -306,7 +327,8 @@ async function testMarkNodeDone() {
 
   // Verify status changed
   const tree = await mcpTool("get_project_tree", { projectId: PROJECT_ID });
-  const child = tree[0]?.children?.[0];
+  const kitchen = tree.find((n: any) => n.name === "Kitchen Full Reno");
+  const child = kitchen?.children?.find((c: any) => c.id === CHILD_NODE_ID);
   assert(child?.status === "COMPLETED", `child status is COMPLETED (got ${child?.status})`);
 }
 
@@ -332,7 +354,7 @@ async function testUploadReceipt() {
 
   // Create a small fake PDF (just the header)
   const fakePdf = Buffer.from("%PDF-1.4 fake content for testing").toString("base64");
-  const result = await mcpTool("upload_receipt", { nodeId: NODE_ID, fileName: "test-receipt.pdf", fileBase64: fakePdf });
+  const result = await mcpTool("upload_receipt", { nodeId: CHILD_NODE_ID, fileName: "test-receipt.pdf", fileBase64: fakePdf });
   if (result._error?.message?.includes("BLOB_READ_WRITE_TOKEN")) {
     // Blob token not available in test env — skip gracefully
     console.log("  ⊘ upload_receipt skipped (BLOB_READ_WRITE_TOKEN not in test env, works on Vercel)");

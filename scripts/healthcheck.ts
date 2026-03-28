@@ -111,19 +111,19 @@ async function testTreeCRUD() {
   const { body: root2 } = await api("/api/nodes", { method: "POST", sessionToken: tok, body: JSON.stringify({ name: "HC Bathroom Reno", projectId: ctx.projectId, categoryId: ctx.cat2Id }) });
   ctx.root2Id = root2.id;
 
-  // Level 2: Child of root1
-  const { status: l2s, body: level2 } = await api("/api/nodes", { method: "POST", sessionToken: tok, body: JSON.stringify({ name: "HC Plumbing Work", projectId: ctx.projectId, parentId: root1.id, vendorId: ctx.vendorId, expectedCost: 5000 }) });
+  // Level 2: Child of root1 (group — no cost)
+  const { status: l2s, body: level2 } = await api("/api/nodes", { method: "POST", sessionToken: tok, body: JSON.stringify({ name: "HC Plumbing Work", projectId: ctx.projectId, parentId: root1.id, vendorId: ctx.vendorId }) });
   assert("Create level-2 node → 201", l2s === 201);
   assert("Level-2 has parent", level2.parentId === root1.id);
   ctx.level2Id = level2.id;
 
-  // Level 3: Child of level2
-  const { status: l3s, body: level3 } = await api("/api/nodes", { method: "POST", sessionToken: tok, body: JSON.stringify({ name: "HC Pipe Replacement", projectId: ctx.projectId, parentId: level2.id, expectedCost: 2000 }) });
+  // Level 3: Child of level2 (group — no cost)
+  const { status: l3s, body: level3 } = await api("/api/nodes", { method: "POST", sessionToken: tok, body: JSON.stringify({ name: "HC Pipe Replacement", projectId: ctx.projectId, parentId: level2.id }) });
   assert("Create level-3 node → 201", l3s === 201);
   assert("Level-3 has grandparent chain", level3.parentId === level2.id);
   ctx.level3Id = level3.id;
 
-  // Level 4: Child of level3
+  // Level 4: Child of level3 (leaf — has cost)
   const { status: l4s, body: level4 } = await api("/api/nodes", { method: "POST", sessionToken: tok, body: JSON.stringify({ name: "HC Copper Fitting", projectId: ctx.projectId, parentId: level3.id, expectedCost: 500 }) });
   assert("Create level-4 node → 201", l4s === 201);
   ctx.level4Id = level4.id;
@@ -206,18 +206,19 @@ async function testMilestones() {
   section("MILESTONES");
   const tok = ctx.ownerToken;
 
-  const fd = new FormData(); fd.append("label", "Deposit"); fd.append("amount", "1500"); fd.append("dueDate", "2026-06-01");
-  const { status: mc, body: m } = await api(`/api/nodes/${ctx.level2Id}/milestones`, { method: "POST", sessionToken: tok, body: fd });
+  // Milestones on leaf node (level4, cost=500)
+  const fd = new FormData(); fd.append("label", "Deposit"); fd.append("amount", "150"); fd.append("dueDate", "2026-06-01");
+  const { status: mc, body: m } = await api(`/api/nodes/${ctx.level4Id}/milestones`, { method: "POST", sessionToken: tok, body: fd });
   assert("Create milestone → 201", mc === 201);
   ctx.msId = m.id;
 
   const fd2 = new FormData(); fd2.append("label", "Completion"); fd2.append("percentage", "70");
-  const { status: mc2, body: m2 } = await api(`/api/nodes/${ctx.level2Id}/milestones`, { method: "POST", sessionToken: tok, body: fd2 });
+  const { status: mc2, body: m2 } = await api(`/api/nodes/${ctx.level4Id}/milestones`, { method: "POST", sessionToken: tok, body: fd2 });
   assert("Create milestone (%) → 201", mc2 === 201);
-  assert("Amount = 70% of 5000", Number(m2.amount) === 3500);
+  assert("Amount = 70% of 500", Number(m2.amount) === 350);
 
   const fd3 = new FormData(); fd3.append("status", "PAID"); fd3.append("paidDate", new Date().toISOString());
-  const { body: paid } = await api(`/api/nodes/${ctx.level2Id}/milestones/${ctx.msId}`, { method: "PATCH", sessionToken: tok, body: fd3 });
+  const { body: paid } = await api(`/api/nodes/${ctx.level4Id}/milestones/${ctx.msId}`, { method: "PATCH", sessionToken: tok, body: fd3 });
   assert("Mark paid", paid.status === "PAID");
 
   const { body: agg } = await api(`/api/projects/${ctx.projectId}/milestones`, { sessionToken: tok });
