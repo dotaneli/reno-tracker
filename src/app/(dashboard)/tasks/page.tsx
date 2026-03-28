@@ -359,8 +359,14 @@ function TaskCard({ node, parentName, tr, fmt, t, onEdit, onMutate, projectId }:
 }) {
   const { lang } = useI18n();
   const [expanded, setExpanded] = useState(false);
-  const cost = Number(node.expectedCost || 0);
-  const paid = Number(node._paid || 0);
+
+  // Roll up costs from children (same as NodeTree's sumCosts/sumPaid)
+  const ownCost = Number(node.expectedCost || 0);
+  const childCost = (node.children || []).reduce((s: number, c: any) => s + (Number(c.expectedCost) || 0), 0);
+  const cost = ownCost + childCost;
+  const ownPaid = Number(node._paid || 0);
+  const childPaid = (node.children || []).reduce((s: number, c: any) => s + (Number(c._paid) || 0), 0);
+  const paid = ownPaid + childPaid;
   const remaining = cost - paid;
   const pct = cost > 0 ? Math.round((paid / cost) * 100) : 0;
   const isDone = node.status === "COMPLETED";
