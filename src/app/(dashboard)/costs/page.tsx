@@ -277,36 +277,14 @@ export default function CostsPage() {
               {unpaidData.pendingGroups.length === 0 ? (
                 <p className="text-xs text-[var(--fg-muted)] py-2">—</p>
               ) : unpaidData.pendingGroups.map((g) => {
-                const hasOverdue = g.unpaidMs.some((m: any) => m.dueDate && new Date(m.dueDate) < new Date());
+                const node = (allNodes || []).find((n: any) => n.id === g.nodeId);
                 return (
-                  <Card key={g.nodeId} className={`!p-3 ${hasOverdue ? "border-[var(--alert)]/20" : ""}`}>
-                    <Expandable trigger={
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="text-xs font-semibold text-[var(--fg)]">{tr(g.name)}</p>
-                          <p className="text-[10px] text-[var(--fg-muted)]">{fmt(g.paid)} / {fmt(g.cost)}</p>
-                        </div>
-                        <p className="text-xs font-bold text-[var(--alert)]">{fmt(g.remaining)} <span className="font-normal text-[var(--fg-muted)]">({fmt(g.cost)})</span></p>
-                      </div>
-                    }>
-                      <div className="space-y-1 rounded-lg bg-[var(--bg)] p-2 mt-1">
-                        {g.unpaidMs.map((m: any) => (
-                          <div key={m.id} className="flex items-center justify-between text-[11px] py-0.5">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[var(--fg)]">{m.label}</span>
-                              {m.dueDate && <span className={`${new Date(m.dueDate) < new Date() ? "text-[var(--alert)] font-semibold" : "text-[var(--fg-muted)]"}`}>{new Date(m.dueDate).toLocaleDateString(lang === "he" ? "he-IL" : "en-IL", { day: "numeric", month: "short" })}</span>}
-                            </div>
-                            <div className="flex items-center gap-1"><span className="font-semibold">{fmt(Number(m.amount))}</span><StatusBadge status={m.status} /></div>
-                          </div>
-                        ))}
-                        {g.gap > 0 && (
-                          <div className="flex items-center justify-between text-[11px] py-0.5 rounded bg-amber-50 px-1.5">
-                            <span className="text-amber-700">{t("costs.unscheduled")}</span>
-                            <span className="font-semibold text-amber-700">{fmt(g.gap)}</span>
-                          </div>
-                        )}
-                      </div>
-                    </Expandable>
+                  <Card key={g.nodeId} className="!p-2">
+                    {node ? (
+                      <TaskLine node={node} tr={tr} compact onMutate={mutateAll} />
+                    ) : (
+                      <div className="px-2 py-1.5 text-xs font-semibold text-[var(--fg)]">{tr(g.name)}</div>
+                    )}
                   </Card>
                 );
               })}
