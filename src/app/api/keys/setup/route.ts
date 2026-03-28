@@ -55,12 +55,14 @@ All requests need header: Authorization: Bearer ${keyPlaintext}`;
       return {
         platform: "Gemini",
         steps: [
-          { step: 1, title: "Open Gemini", description: "Go to gemini.google.com" },
-          { step: 2, title: "Create a Gem", description: 'Click your profile → Gems → Create Gem (or "New Gem")' },
-          { step: 3, title: "Paste Instructions", description: "Paste this as the Gem instructions — it includes your API key", copyable: systemPrompt },
-          { step: 4, title: "Test It", description: 'Try saying: "Show me my renovation projects"' },
+          { step: 1, title: "Open Google AI Studio", description: "Go to aistudio.google.com (not gemini.google.com — Gems cannot make HTTP calls)" },
+          { step: 2, title: "Create a New Prompt", description: 'Click "Create New" → choose "Structured prompt" or "Freeform"' },
+          { step: 3, title: "Add System Instructions", description: "Paste this as the system instruction — it includes your API key and all available endpoints", copyable: systemPrompt },
+          { step: 4, title: "Enable Function Calling", description: 'In the right panel, enable "Tools" → "Code execution" so Gemini can make HTTP requests' },
+          { step: 5, title: "Test It", description: 'Try: "Fetch my renovation projects from the API and show me the status"' },
         ],
         systemPrompt,
+        note: "Important: Regular Gemini Gems cannot make HTTP calls. Use Google AI Studio with code execution enabled, or use ChatGPT Custom GPTs for the easiest experience.",
         key: keyPlaintext,
       };
 

@@ -359,6 +359,8 @@ export async function executeTool(toolName: string, args: Record<string, any>, a
 
     case "create_node": {
       const { projectId, name, parentId, expectedCost, vendorId, categoryId, status } = args;
+      if (!name?.trim()) throw new AuthError("name is required", 400);
+      if (!projectId?.trim()) throw new AuthError("projectId is required", 400);
       checkProjectScope(auth, projectId);
       await requireProjectAccess(userId, projectId, ["OWNER", "EDITOR"]);
       if (parentId) {
