@@ -170,8 +170,17 @@ export default function TasksPage() {
           <div className="h-4 w-px bg-white/20 hidden sm:block" />
           <div className="flex items-center gap-1.5 text-xs">
             <span className="opacity-70">{t("costs.totalRemaining")}</span>
-            <span className="font-bold text-amber-300">{fmt(fin.remainingPayments)}</span>
+            <span className="font-bold text-amber-300">{fmt(fin.remainingToPay)}</span>
           </div>
+          {fin.unscheduled > 0 && (
+            <>
+              <div className="h-4 w-px bg-white/20 hidden sm:block" />
+              <div className="flex items-center gap-1.5 text-xs">
+                <span className="opacity-70">Unscheduled</span>
+                <span className="font-bold text-red-400">{fmt(fin.unscheduled)}</span>
+              </div>
+            </>
+          )}
           <div className="ms-auto flex items-center gap-1.5 text-xs">
             <span className="opacity-70">{t("task.budgetRemaining")}</span>
             <span className={`font-bold ${fin.budgetRemaining >= 0 ? "text-[#78B080]" : "text-red-400"}`}>{fmt(fin.budgetRemaining)}</span>

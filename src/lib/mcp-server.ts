@@ -321,9 +321,10 @@ export async function executeTool(toolName: string, args: Record<string, any>, a
 
       return {
         totalBudget, totalCost, totalPaid, totalMilestoned,
-        remainingPayments: totalMilestoned - totalPaid,
+        remainingToPay: totalCost - totalPaid,
+        unscheduled: totalCost - totalMilestoned,
         budgetRemaining: totalBudget - totalCost,
-        paidPercent: totalMilestoned > 0 ? Math.round((totalPaid / totalMilestoned) * 100) : 0,
+        paidPercent: totalCost > 0 ? Math.round((totalPaid / totalCost) * 100) : 0,
         costPercent: totalBudget > 0 ? Math.round((totalCost / totalBudget) * 100) : 0,
         overdueMilestones: overdue,
       };

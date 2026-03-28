@@ -59,10 +59,18 @@ export default function DashboardPage() {
           </div>
         </StatCard>
 
-        <StatCard label={t("costs.totalRemaining")} value={fmt(fin.remainingPayments)} accent={fin.remainingPayments > 0} icon={<CalendarDays size={18} />}>
-          <div className="max-h-40 overflow-y-auto space-y-0.5">
-            {fin.unpaidMilestones.length === 0 ? <p className="text-xs text-[var(--fg-muted)]">—</p> :
-              fin.unpaidMilestones.map((m: any) => <MilestoneLine key={m.id} m={m} tr={tr} />)}
+        <StatCard label={t("costs.totalRemaining")} value={fmt(fin.remainingToPay)} accent={fin.remainingToPay > 0} icon={<CalendarDays size={18} />}>
+          <div className="space-y-2 text-xs">
+            <div className="space-y-1">
+              <div className="flex justify-between"><span className="text-[var(--fg-muted)]">{t("costs.totalCost")}</span><span className="font-semibold">{fmt(fin.totalCost)}</span></div>
+              <div className="flex justify-between"><span className="text-[var(--fg-muted)]">{t("costs.totalPaid")}</span><span className="font-semibold text-[var(--success)]">-{fmt(fin.totalPaid)}</span></div>
+              {fin.unscheduled > 0 && <div className="flex justify-between"><span className="text-[var(--fg-muted)]">Not yet scheduled</span><span className="font-semibold text-[var(--alert)]">{fmt(fin.unscheduled)}</span></div>}
+            </div>
+            {fin.unpaidMilestones.length > 0 && (
+              <div className="max-h-28 overflow-y-auto border-t border-[var(--border-subtle)] pt-1.5 space-y-0.5">
+                {fin.unpaidMilestones.map((m: any) => <MilestoneLine key={m.id} m={m} tr={tr} />)}
+              </div>
+            )}
           </div>
         </StatCard>
 

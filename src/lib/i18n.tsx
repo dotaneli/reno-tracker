@@ -213,7 +213,7 @@ const dict = {
   "costs.title": { en: "Cost Insights", he: "תובנות עלויות" },
   "costs.totalCost": { en: "Total Cost", he: "עלות כוללת" },
   "costs.totalPaid": { en: "Total Paid", he: "סה״כ שולם" },
-  "costs.totalRemaining": { en: "Remaining Payments", he: "תשלומים שנותרו" },
+  "costs.totalRemaining": { en: "Remaining to Pay", he: "נותר לשלם" },
   "costs.byTask": { en: "By Task Group", he: "לפי קבוצת משימות" },
   "costs.upcomingPayments": { en: "Upcoming Payments", he: "תשלומים קרובים" },
   "costs.paymentCalendar": { en: "Payment Calendar", he: "לוח תשלומים" },

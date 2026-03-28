@@ -292,7 +292,8 @@ async function testGetFinancialSummary() {
   assert(fin.totalCost === 32000, `total cost = 30000 + 2000 = 32000 (got ${fin.totalCost})`);
   assert(fin.totalPaid === 5000, `paid = 5000 deposit (got ${fin.totalPaid})`);
   assert(fin.totalMilestoned === 20000, `milestoned = 5000 + 15000 = 20000 (got ${fin.totalMilestoned})`);
-  assert(fin.remainingPayments === 15000, `remaining = 20000 - 5000 = 15000 (got ${fin.remainingPayments})`);
+  assert(fin.remainingToPay === 27000, `remaining to pay = 32000 - 5000 = 27000 (got ${fin.remainingToPay})`);
+  assert(fin.unscheduled === 12000, `unscheduled = 32000 - 20000 = 12000 (got ${fin.unscheduled})`);
   assert(fin.budgetRemaining === 68000, `budget remaining = 100000 - 32000 = 68000 (got ${fin.budgetRemaining})`);
 }
 
