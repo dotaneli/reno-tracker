@@ -12,6 +12,50 @@ import { TaskLine, MilestoneLine } from "@/components/TaskLine";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Wallet, TrendingUp, AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, PiggyBank, CircleDollarSign, CheckCircle2 } from "lucide-react";
 
+// ── SVG Donut Chart ──
+function DonutChart({ segments, size = 180, strokeWidth = 28 }: { segments: { value: number; color: string; label: string }[]; size?: number; strokeWidth?: number }) {
+  const total = segments.reduce((s, seg) => s + seg.value, 0);
+  if (total === 0) return null;
+  const r = (size - strokeWidth) / 2;
+  const c = Math.PI * 2 * r;
+  let offset = 0;
+
+  return (
+    <div className="flex flex-col items-center gap-3">
+      <svg width={size} height={size} className="drop-shadow-sm">
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--border-subtle)" strokeWidth={strokeWidth} />
+        {segments.filter(s => s.value > 0).map((seg, i) => {
+          const pct = seg.value / total;
+          const dash = c * pct;
+          const gap = c - dash;
+          const currentOffset = offset;
+          offset += pct;
+          return (
+            <circle
+              key={i}
+              cx={size / 2} cy={size / 2} r={r}
+              fill="none" stroke={seg.color} strokeWidth={strokeWidth}
+              strokeDasharray={`${dash} ${gap}`}
+              strokeDashoffset={-c * currentOffset + c * 0.25}
+              strokeLinecap="round"
+              className="transition-all duration-700"
+            />
+          );
+        })}
+      </svg>
+      <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
+        {segments.filter(s => s.value > 0).map((seg, i) => (
+          <div key={i} className="flex items-center gap-1.5 text-[11px]">
+            <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: seg.color }} />
+            <span className="text-[var(--fg-muted)]">{seg.label}</span>
+            <span className="font-semibold text-[var(--fg)]">{Math.round(seg.value / total * 100)}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function CostsPage() {
   const { t, lang } = useI18n();
   const { activeProject: project } = useProject();
@@ -43,6 +87,47 @@ export default function CostsPage() {
     }).filter((n) => n.expected > 0);
   }, [rootNodes, allNodes, ms]);
 
+  // Unpaid deepdive computation
+  const unpaidData = useMemo(() => {
+    const nodePayments = new Map<string, { milestoned: number; paid: number; unpaidMs: any[] }>();
+    for (const m of ms) {
+      if (!nodePayments.has(m.nodeId)) nodePayments.set(m.nodeId, { milestoned: 0, paid: 0, unpaidMs: [] });
+      const np = nodePayments.get(m.nodeId)!;
+      np.milestoned += Number(m.amount);
+      if (m.status === "PAID") np.paid += Number(m.amount);
+      else np.unpaidMs.push(m);
+    }
+
+    // Pending: tasks with unpaid milestones
+    const pendingGroups: { nodeId: string; name: string; cost: number; paid: number; remaining: number; unpaidMs: any[]; gap: number }[] = [];
+    // Gap-only: tasks with all milestones paid but milestoned < cost
+    const gapGroups: { nodeId: string; name: string; cost: number; paid: number; gap: number }[] = [];
+
+    for (const [nodeId, np] of nodePayments) {
+      const node = (allNodes || []).find((n: any) => n.id === nodeId);
+      const cost = Number(node?.expectedCost || 0);
+      const gap = cost > np.milestoned ? cost - np.milestoned : 0;
+
+      if (np.unpaidMs.length > 0) {
+        const remaining = np.unpaidMs.reduce((s: number, m: any) => s + Number(m.amount), 0) + gap;
+        pendingGroups.push({ nodeId, name: np.unpaidMs[0]?.nodeName || node?.name || "—", cost, paid: np.paid, remaining, unpaidMs: np.unpaidMs, gap });
+      } else if (gap > 0) {
+        gapGroups.push({ nodeId, name: node?.name || "—", cost, paid: np.paid, gap });
+      }
+    }
+
+    pendingGroups.sort((a, b) => b.remaining - a.remaining);
+    gapGroups.sort((a, b) => b.gap - a.gap);
+
+    const noPaymentTasks = (allNodes || []).filter((n: any) => Number(n.expectedCost) > 0 && !nodePayments.has(n.id));
+    noPaymentTasks.sort((a: any, b: any) => Number(b.expectedCost) - Number(a.expectedCost));
+    const noPaymentTotal = noPaymentTasks.reduce((s: number, n: any) => s + Number(n.expectedCost), 0);
+    const pendingTotal = pendingGroups.reduce((s, g) => s + g.remaining, 0);
+    const gapTotal = gapGroups.reduce((s, g) => s + g.gap, 0);
+
+    return { pendingGroups, gapGroups, noPaymentTasks, noPaymentTotal, pendingTotal, gapTotal };
+  }, [ms, allNodes]);
+
   const calDays = useMemo(() => {
     const y = calMonth.getFullYear(), mo = calMonth.getMonth();
     const first = new Date(y, mo, 1), last = new Date(y, mo + 1, 0);
@@ -62,51 +147,62 @@ export default function CostsPage() {
     <div className="mx-auto max-w-5xl space-y-6">
       <h1 className="text-xl md:text-2xl font-bold tracking-tight text-[var(--fg)]">{t("costs.title")}</h1>
 
-      {/* ALL stats expandable */}
-      <div className="grid gap-3 grid-cols-2 md:grid-cols-5">
-        <StatCard label={t("dash.budget")} value={fmt(fin.totalBudget)} icon={<Wallet size={18} />}>
-          <div className="space-y-1 text-xs">
-            <div className="flex justify-between"><span className="text-[var(--fg-muted)]">{t("costs.totalCost")}</span><span className="font-semibold">{fmt(fin.totalCost)}</span></div>
-            <div className="flex justify-between"><span className="text-[var(--fg-muted)]">{t("dash.tasks")}</span><span>{costNodes.length}</span></div>
-          </div>
-        </StatCard>
+      {/* ── Donut Chart + Stats ── */}
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-[auto_1fr]">
+        <Card className="flex items-center justify-center !p-6">
+          <DonutChart segments={[
+            { value: fin.totalPaid, color: "#5E8A66", label: t("costs.totalPaid") },
+            { value: fin.remainingToPay - fin.unscheduled, color: "#B8956A", label: t("costs.pendingPayments") },
+            { value: fin.unscheduled, color: "#C4614A", label: t("costs.unscheduled") },
+            { value: Math.max(fin.budgetRemaining, 0), color: "#E8E3DD", label: t("task.budgetRemaining") },
+          ]} />
+        </Card>
 
-        <StatCard label={t("costs.totalCost")} value={fmt(fin.totalCost)} icon={<TrendingUp size={18} />}>
-          <div className="max-h-40 overflow-y-auto space-y-0.5">
-            {costNodes.map((n: any) => <TaskLine key={n.id} node={n} tr={tr} compact />)}
-          </div>
-        </StatCard>
+        <div className="grid gap-3 grid-cols-2 md:grid-cols-3 content-start">
+          <StatCard label={t("dash.budget")} value={fmt(fin.totalBudget)} icon={<Wallet size={18} />}>
+            <div className="space-y-1 text-xs">
+              <div className="flex justify-between"><span className="text-[var(--fg-muted)]">{t("costs.totalCost")}</span><span className="font-semibold">{fmt(fin.totalCost)}</span></div>
+              <div className="flex justify-between"><span className="text-[var(--fg-muted)]">{t("dash.tasks")}</span><span>{costNodes.length}</span></div>
+            </div>
+          </StatCard>
 
-        <StatCard label={t("costs.totalPaid")} value={fmt(fin.totalPaid)} icon={<Wallet size={18} />}>
-          <div className="max-h-40 overflow-y-auto space-y-0.5">
-            {fin.paidMilestones.length === 0 ? <p className="text-xs text-[var(--fg-muted)]">—</p> :
-              fin.paidMilestones.map((m: any) => <MilestoneLine key={m.id} m={m} tr={tr} />)}
-          </div>
-        </StatCard>
+          <StatCard label={t("costs.totalPaid")} value={fmt(fin.totalPaid)} icon={<TrendingUp size={18} />}>
+            <div className="max-h-32 overflow-y-auto space-y-0.5">
+              {fin.paidMilestones.length === 0 ? <p className="text-xs text-[var(--fg-muted)]">—</p> :
+                fin.paidMilestones.map((m: any) => <MilestoneLine key={m.id} m={m} tr={tr} />)}
+            </div>
+          </StatCard>
 
-        <StatCard label={t("costs.totalRemaining")} value={fmt(fin.remainingToPay)} accent={fin.remainingToPay > 0} icon={<CalendarDays size={18} />}>
-          <div className="space-y-2 text-xs">
-            <div className="space-y-1">
+          <StatCard label={t("costs.totalRemaining")} value={fmt(fin.remainingToPay)} accent={fin.remainingToPay > 0} icon={<CalendarDays size={18} />}>
+            <div className="space-y-1 text-xs">
               <div className="flex justify-between"><span className="text-[var(--fg-muted)]">{t("costs.totalCost")}</span><span className="font-semibold">{fmt(fin.totalCost)}</span></div>
               <div className="flex justify-between"><span className="text-[var(--fg-muted)]">{t("costs.totalPaid")}</span><span className="font-semibold text-[var(--success)]">-{fmt(fin.totalPaid)}</span></div>
               {fin.unscheduled > 0 && <div className="flex justify-between"><span className="text-[var(--fg-muted)]">{t("costs.unscheduled")}</span><span className="font-semibold text-[var(--alert)]">{fmt(fin.unscheduled)}</span></div>}
             </div>
-            {fin.unpaidMilestones.length > 0 && (
-              <div className="max-h-28 overflow-y-auto border-t border-[var(--border-subtle)] pt-1.5 space-y-0.5">
-                {fin.unpaidMilestones.map((m: any) => <MilestoneLine key={m.id} m={m} tr={tr} />)}
-              </div>
-            )}
-          </div>
-        </StatCard>
+          </StatCard>
 
-        <StatCard label={t("task.budgetRemaining")} value={fmt(fin.budgetRemaining)} accent={fin.budgetRemaining < 0} icon={<PiggyBank size={18} />}>
-          <div className="space-y-1 text-xs">
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--border-subtle)]">
-              <div className={`h-full rounded-full ${fin.budgetRemaining >= 0 ? "bg-[var(--success)]" : "bg-[var(--alert)]"}`} style={{ width: `${Math.min(fin.costPct, 100)}%` }} />
+          <StatCard label={t("costs.totalCost")} value={fmt(fin.totalCost)} icon={<TrendingUp size={18} />}>
+            <div className="max-h-32 overflow-y-auto space-y-0.5">
+              {costNodes.map((n: any) => <TaskLine key={n.id} node={n} tr={tr} compact />)}
             </div>
-            <p className="text-center text-[10px] text-[var(--fg-muted)]">{fin.costPct}% {t("task.ofBudget")}</p>
-          </div>
-        </StatCard>
+          </StatCard>
+
+          <StatCard label={t("task.budgetRemaining")} value={fmt(fin.budgetRemaining)} accent={fin.budgetRemaining < 0} icon={<PiggyBank size={18} />}>
+            <div className="space-y-1 text-xs">
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--border-subtle)]">
+                <div className={`h-full rounded-full ${fin.budgetRemaining >= 0 ? "bg-[var(--success)]" : "bg-[var(--alert)]"}`} style={{ width: `${Math.min(fin.costPct, 100)}%` }} />
+              </div>
+              <p className="text-center text-[10px] text-[var(--fg-muted)]">{fin.costPct}% {t("task.ofBudget")}</p>
+            </div>
+          </StatCard>
+
+          <StatCard label={t("dash.openIssues")} value={fin.overdueMilestones.length} accent={fin.overdueMilestones.length > 0} icon={<AlertTriangle size={18} />}>
+            <div className="max-h-32 overflow-y-auto space-y-0.5">
+              {fin.overdueMilestones.length === 0 ? <p className="text-xs text-[var(--fg-muted)]">—</p> :
+                fin.overdueMilestones.map((m: any) => <MilestoneLine key={m.id} m={m} tr={tr} />)}
+            </div>
+          </StatCard>
+        </div>
       </div>
 
       {/* Progress */}
@@ -120,148 +216,115 @@ export default function CostsPage() {
         </div>
       </Card>
 
-      {/* ── Unpaid Deepdive: milestones + gap + unscheduled tasks ── */}
-      {(() => {
-        // Build per-node payment picture
-        const nodePayments = new Map<string, { milestoned: number; paid: number; unpaidMs: any[] }>();
-        for (const m of ms) {
-          if (!nodePayments.has(m.nodeId)) nodePayments.set(m.nodeId, { milestoned: 0, paid: 0, unpaidMs: [] });
-          const np = nodePayments.get(m.nodeId)!;
-          np.milestoned += Number(m.amount);
-          if (m.status === "PAID") np.paid += Number(m.amount);
-          else np.unpaidMs.push(m);
-        }
+      {/* ── Unpaid Deepdive — three equal sections ── */}
+      <div>
+        <h2 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.15em] text-[var(--fg-muted)]">
+          <CircleDollarSign size={14} className={fin.remainingToPay > 0 ? "text-[var(--alert)]" : "text-[var(--success)]"} />
+          {t("costs.unpaidBreakdown")}
+          {fin.remainingToPay > 0 && (
+            <span className="rounded-full bg-[var(--alert-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--alert)]">{fmt(fin.remainingToPay)}</span>
+          )}
+        </h2>
 
-        // 1. Tasks with unpaid milestones (grouped, includes gap info)
-        const msGroups: { nodeId: string; taskName: string; taskCost: number; taskPaid: number; unpaidMs: any[]; gap: number }[] = [];
-        for (const [nodeId, np] of nodePayments) {
-          if (np.unpaidMs.length === 0) {
-            // All milestones paid — but is there a gap?
-            const node = (allNodes || []).find((n: any) => n.id === nodeId);
-            const cost = Number(node?.expectedCost || 0);
-            const gap = cost - np.milestoned;
-            if (gap > 0) {
-              msGroups.push({ nodeId, taskName: node?.name || "—", taskCost: cost, taskPaid: np.paid, unpaidMs: [], gap });
-            }
-            continue;
-          }
-          const node = (allNodes || []).find((n: any) => n.id === nodeId);
-          const cost = Number(node?.expectedCost || 0);
-          const gap = cost > np.milestoned ? cost - np.milestoned : 0;
-          msGroups.push({ nodeId, taskName: np.unpaidMs[0]?.nodeName || node?.name || "—", taskCost: cost, taskPaid: np.paid, unpaidMs: np.unpaidMs, gap });
-        }
-        msGroups.sort((a, b) => {
-          const aTotal = a.unpaidMs.reduce((s: number, m: any) => s + Number(m.amount), 0) + a.gap;
-          const bTotal = b.unpaidMs.reduce((s: number, m: any) => s + Number(m.amount), 0) + b.gap;
-          return bTotal - aTotal;
-        });
-        // Filter out groups with nothing owed
-        const activeGroups = msGroups.filter(g => g.unpaidMs.length > 0 || g.gap > 0);
-
-        // 2. Tasks with cost but NO milestones at all
-        const noPaymentTasks = (allNodes || []).filter((n: any) => Number(n.expectedCost) > 0 && !nodePayments.has(n.id));
-        const noPaymentTotal = noPaymentTasks.reduce((s: number, n: any) => s + Number(n.expectedCost), 0);
-
-        // Grand total = what "Remaining to Pay" shows
-        const grandUnpaid = fin.remainingToPay;
-        const totalItems = activeGroups.length + noPaymentTasks.length;
-        const hasAny = totalItems > 0;
-
-        return (
-          <div>
-            <h2 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.15em] text-[var(--fg-muted)]">
-              <CircleDollarSign size={14} className={hasAny ? "text-[var(--alert)]" : "text-[var(--success)]"} />
-              {t("costs.unpaidBreakdown")}
-              {hasAny && (
-                <span className="rounded-full bg-[var(--alert-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--alert)]">{totalItems} · {fmt(grandUnpaid)}</span>
-              )}
-            </h2>
-            {!hasAny ? (
-              <Card>
-                <div className="flex items-center gap-2 py-4 justify-center">
-                  <CheckCircle2 size={16} className="text-[var(--success)]" />
-                  <p className="text-sm font-medium text-[var(--success)]">{t("costs.noUnpaid")}</p>
-                </div>
-              </Card>
-            ) : (
-              <div className="space-y-2">
-                {/* Tasks with unpaid milestones and/or gaps */}
-                {activeGroups.map((group) => {
-                  const msUnpaid = group.unpaidMs.reduce((s: number, m: any) => s + Number(m.amount), 0);
-                  const groupTotal = msUnpaid + group.gap;
-                  const hasOverdue = group.unpaidMs.some((m: any) => m.dueDate && new Date(m.dueDate) < new Date());
-                  return (
-                    <Card key={group.nodeId} className={hasOverdue ? "border-[var(--alert)]/20" : ""}>
-                      <Expandable trigger={
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-semibold text-[var(--fg)]">{tr(group.taskName)}</p>
-                            <p className="text-[11px] text-[var(--fg-muted)]">
-                              {group.taskCost > 0 && <>{fmt(group.taskPaid)} / {fmt(group.taskCost)}</>}
-                              {group.unpaidMs.length > 0 && <> · {group.unpaidMs.length} {t("task.milestones").toLowerCase()}</>}
-                              {group.gap > 0 && <> · {fmt(group.gap)} {t("costs.unscheduled").toLowerCase()}</>}
-                              {hasOverdue && <span className="ms-2 text-[var(--alert)]">{t("costs.overdue")}</span>}
-                            </p>
-                          </div>
-                          <p className={`text-sm font-bold ${hasOverdue ? "text-[var(--alert)]" : "text-[var(--fg)]"}`}>{fmt(groupTotal)}</p>
-                        </div>
-                      }>
-                        <div className="space-y-1 rounded-lg bg-[var(--bg)] p-2">
-                          {group.unpaidMs.map((m: any) => {
-                            const isOverdue = m.dueDate && new Date(m.dueDate) < new Date();
-                            return (
-                              <div key={m.id} className="flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-xs hover:bg-[var(--warm-glow)]">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <span className="font-medium text-[var(--fg)]">{m.label}</span>
-                                  {m.dueDate && (
-                                    <span className={`text-[11px] ${isOverdue ? "font-semibold text-[var(--alert)]" : "text-[var(--fg-muted)]"}`}>
-                                      {new Date(m.dueDate).toLocaleDateString(lang === "he" ? "he-IL" : "en-IL", { day: "numeric", month: "short" })}
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-1.5 shrink-0">
-                                  <span className="font-semibold">{fmt(Number(m.amount))}</span>
-                                  <StatusBadge status={m.status} />
-                                </div>
-                              </div>
-                            );
-                          })}
-                          {group.gap > 0 && (
-                            <div className="flex items-center justify-between gap-3 rounded-lg bg-amber-50 px-2 py-1.5 text-xs">
-                              <span className="font-medium text-amber-700">{t("costs.unscheduled")}</span>
-                              <span className="font-semibold text-amber-700">{fmt(group.gap)}</span>
-                            </div>
-                          )}
-                        </div>
-                      </Expandable>
-                    </Card>
-                  );
-                })}
-
-                {/* Tasks with cost but NO payments at all */}
-                {noPaymentTasks.length > 0 && (
-                  <>
-                    <p className="mt-2 text-[10px] font-bold uppercase tracking-wider text-[var(--fg-muted)]">{t("costs.unscheduled")} — {noPaymentTasks.length} · {fmt(noPaymentTotal)}</p>
-                    {noPaymentTasks.sort((a: any, b: any) => Number(b.expectedCost) - Number(a.expectedCost)).map((n: any) => (
-                      <Card key={n.id}>
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="text-sm font-semibold text-[var(--fg)]">{tr(n.name)}</p>
-                            <p className="text-[11px] text-[var(--fg-muted)]">{n.vendor?.name ? tr(n.vendor.name) : ""}{n.category?.name ? ` · ${tr(n.category.name)}` : ""}</p>
-                          </div>
-                          <p className="text-sm font-bold text-[var(--alert)]">{fmt(Number(n.expectedCost))}</p>
-                        </div>
-                      </Card>
-                    ))}
-                  </>
-                )}
+        {fin.remainingToPay <= 0 ? (
+          <Card>
+            <div className="flex items-center gap-2 py-4 justify-center">
+              <CheckCircle2 size={16} className="text-[var(--success)]" />
+              <p className="text-sm font-medium text-[var(--success)]">{t("costs.noUnpaid")}</p>
+            </div>
+          </Card>
+        ) : (
+          <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
+            {/* Column 1: Pending Payments */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent)]">{t("costs.pendingPayments")}</p>
+                {unpaidData.pendingTotal > 0 && <span className="text-[10px] font-bold text-[var(--accent)]">{fmt(unpaidData.pendingTotal)}</span>}
               </div>
-            )}
-          </div>
-        );
-      })()}
+              {unpaidData.pendingGroups.length === 0 ? (
+                <p className="text-xs text-[var(--fg-muted)] py-2">—</p>
+              ) : unpaidData.pendingGroups.map((g) => {
+                const hasOverdue = g.unpaidMs.some((m: any) => m.dueDate && new Date(m.dueDate) < new Date());
+                return (
+                  <Card key={g.nodeId} className={`!p-3 ${hasOverdue ? "border-[var(--alert)]/20" : ""}`}>
+                    <Expandable trigger={
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-[var(--fg)]">{tr(g.name)}</p>
+                          <p className="text-[10px] text-[var(--fg-muted)]">{fmt(g.paid)} / {fmt(g.cost)}</p>
+                        </div>
+                        <p className="text-xs font-bold text-[var(--alert)]">{fmt(g.remaining)} <span className="font-normal text-[var(--fg-muted)]">({fmt(g.cost)})</span></p>
+                      </div>
+                    }>
+                      <div className="space-y-1 rounded-lg bg-[var(--bg)] p-2 mt-1">
+                        {g.unpaidMs.map((m: any) => (
+                          <div key={m.id} className="flex items-center justify-between text-[11px] py-0.5">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[var(--fg)]">{m.label}</span>
+                              {m.dueDate && <span className={`${new Date(m.dueDate) < new Date() ? "text-[var(--alert)] font-semibold" : "text-[var(--fg-muted)]"}`}>{new Date(m.dueDate).toLocaleDateString(lang === "he" ? "he-IL" : "en-IL", { day: "numeric", month: "short" })}</span>}
+                            </div>
+                            <div className="flex items-center gap-1"><span className="font-semibold">{fmt(Number(m.amount))}</span><StatusBadge status={m.status} /></div>
+                          </div>
+                        ))}
+                        {g.gap > 0 && (
+                          <div className="flex items-center justify-between text-[11px] py-0.5 rounded bg-amber-50 px-1.5">
+                            <span className="text-amber-700">{t("costs.unscheduled")}</span>
+                            <span className="font-semibold text-amber-700">{fmt(g.gap)}</span>
+                          </div>
+                        )}
+                      </div>
+                    </Expandable>
+                  </Card>
+                );
+              })}
+            </div>
 
-      {/* Per task group — expandable with tasks AND milestones */}
+            {/* Column 2: Partially Scheduled (gap only) */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-amber-600">{t("costs.gapPayments")}</p>
+                {unpaidData.gapTotal > 0 && <span className="text-[10px] font-bold text-amber-600">{fmt(unpaidData.gapTotal)}</span>}
+              </div>
+              {unpaidData.gapGroups.length === 0 ? (
+                <p className="text-xs text-[var(--fg-muted)] py-2">—</p>
+              ) : unpaidData.gapGroups.map((g) => (
+                <Card key={g.nodeId} className="!p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-[var(--fg)]">{tr(g.name)}</p>
+                      <p className="text-[10px] text-[var(--fg-muted)]">{fmt(g.paid)} / {fmt(g.cost)}</p>
+                    </div>
+                    <p className="text-xs font-bold text-amber-600">{fmt(g.gap)} <span className="font-normal text-[var(--fg-muted)]">({fmt(g.cost)})</span></p>
+                  </div>
+                </Card>
+              ))}
+            </div>
+
+            {/* Column 3: No Payments Scheduled */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--alert)]">{t("costs.unscheduledTasks")}</p>
+                {unpaidData.noPaymentTotal > 0 && <span className="text-[10px] font-bold text-[var(--alert)]">{fmt(unpaidData.noPaymentTotal)}</span>}
+              </div>
+              {unpaidData.noPaymentTasks.length === 0 ? (
+                <p className="text-xs text-[var(--fg-muted)] py-2">—</p>
+              ) : unpaidData.noPaymentTasks.map((n: any) => (
+                <Card key={n.id} className="!p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-[var(--fg)]">{tr(n.name)}</p>
+                      <p className="text-[10px] text-[var(--fg-muted)]">{n.vendor?.name ? tr(n.vendor.name) : ""}{n.category?.name ? ` · ${tr(n.category.name)}` : ""}</p>
+                    </div>
+                    <p className="text-xs font-bold text-[var(--alert)]">{fmt(Number(n.expectedCost))}</p>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Per task group — expandable */}
       {nodeBreakdown.length > 0 && (
         <div>
           <h2 className="mb-3 text-xs font-bold uppercase tracking-[0.15em] text-[var(--fg-muted)]">{t("costs.byTask")}</h2>
@@ -278,12 +341,10 @@ export default function CostsPage() {
                   </div>
                 }>
                   <div className="space-y-2">
-                    {/* Tasks in this group */}
                     <div className="rounded-lg bg-[var(--bg)] p-2">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--fg-muted)] mb-1">{t("dash.tasks")}</p>
                       {sp.nodes.map((n: any) => <TaskLine key={n.id} node={n} tr={tr} compact />)}
                     </div>
-                    {/* Milestones in this group */}
                     <div className="rounded-lg bg-[var(--bg)] p-2">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--fg-muted)] mb-1">{t("task.milestones")}</p>
                       {sp.milestones.map((m: any) => <MilestoneLine key={m.id} m={m} tr={tr} />)}
@@ -296,7 +357,7 @@ export default function CostsPage() {
         </div>
       )}
 
-      {/* Overdue — each expandable */}
+      {/* Overdue */}
       {fin.overdueMilestones.length > 0 && (
         <div>
           <h2 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.15em] text-[var(--alert)]">
@@ -321,7 +382,7 @@ export default function CostsPage() {
         </div>
       )}
 
-      {/* Upcoming — each expandable */}
+      {/* Upcoming */}
       {upcomingMilestones.length > 0 && (
         <div>
           <h2 className="mb-3 text-xs font-bold uppercase tracking-[0.15em] text-[var(--fg-muted)]">{t("costs.upcomingPayments")}</h2>

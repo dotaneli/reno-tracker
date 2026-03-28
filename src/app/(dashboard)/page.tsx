@@ -10,7 +10,6 @@ import { Expandable } from "@/components/Expandable";
 import { TaskLine, MilestoneLine } from "@/components/TaskLine";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useRouter } from "next/navigation";
-import { ExportButtons } from "@/components/ExportButtons";
 import { AlertTriangle, Wallet, Layers, Package, TrendingUp, CalendarDays, ArrowUpRight, PiggyBank } from "lucide-react";
 
 export default function DashboardPage() {
@@ -43,9 +42,6 @@ export default function DashboardPage() {
           <h1 className="mt-1 text-xl md:text-3xl font-bold tracking-tight">{tr(project.name)}</h1>
         </div>
       </div>
-
-      {/* Export & Share */}
-      <ExportButtons projectId={project.id} />
 
       {/* Financial stats — ALL expandable */}
       <div className="grid gap-3 grid-cols-2 md:grid-cols-5">
