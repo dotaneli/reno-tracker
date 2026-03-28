@@ -1,21 +1,22 @@
 "use client";
 
+import { useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import { StatusBadge } from "./StatusBadge";
+import { ItemMilestones } from "./ItemMilestones";
+import { CheckCircle2, CircleDollarSign, ChevronRight } from "lucide-react";
 
-/**
- * Reusable task summary line — used everywhere a task/node is referenced.
- * Shows: name, vendor, category, paid/total/remaining, status, date.
- */
 interface TaskLineProps {
   node: any;
-  milestones?: any[];  // milestones for this specific node
+  milestones?: any[];
   tr: (text: string) => string;
-  compact?: boolean;   // less detail for nested lists
+  compact?: boolean;
+  onMutate?: () => void;
 }
 
-export function TaskLine({ node, milestones, tr, compact = false }: TaskLineProps) {
+export function TaskLine({ node, milestones, tr, compact = false, onMutate }: TaskLineProps) {
   const { t, lang } = useI18n();
+  const [expanded, setExpanded] = useState(false);
 
   const fmt = (n: number) => new Intl.NumberFormat(lang === "he" ? "he-IL" : "en-IL", { style: "currency", currency: "ILS", maximumFractionDigits: 0 }).format(n);
 
@@ -25,27 +26,75 @@ export function TaskLine({ node, milestones, tr, compact = false }: TaskLineProp
     : Number(node._paid || 0);
   const remaining = cost - paid;
   const pct = cost > 0 ? Math.round((paid / cost) * 100) : 0;
+  const isDone = node.status === "COMPLETED";
+  const isFullyPaid = cost > 0 && paid >= cost;
+
+  const handleMarkDone = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    await fetch(`/api/nodes/${node.id}/done`, { method: "POST" });
+    onMutate?.();
+  };
+
+  const handleMarkPaid = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    await fetch(`/api/nodes/${node.id}/paid`, { method: "POST" });
+    onMutate?.();
+  };
 
   return (
-    <div className={`flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-lg px-2 -mx-2 transition-colors hover:bg-[var(--warm-glow)] ${compact ? "py-1.5" : "py-2"}`}>
-      <div className="flex flex-wrap items-center gap-1.5 min-w-0">
-        <span className={`font-semibold text-[var(--fg)] ${compact ? "text-xs" : "text-sm"}`}>{tr(node.name)}</span>
-        {node.vendor?.name && <span className="text-xs text-[var(--fg-muted)]">{tr(node.vendor.name)}</span>}
-        {(node.category?.name || node.nodeType) && (
-          <span className="rounded bg-[var(--accent-soft)] px-1.5 py-px text-[8px] font-bold uppercase text-[var(--accent)]">
-            {node.category?.name ? tr(node.category.name) : node.nodeType}
-          </span>
-        )}
-        <StatusBadge status={node.status} />
+    <div className="-mx-2">
+      {/* Clickable row */}
+      <div
+        onClick={() => cost > 0 && setExpanded(!expanded)}
+        className={`flex flex-wrap items-center justify-between gap-x-2 gap-y-1 rounded-lg px-2 transition-colors ${cost > 0 ? "cursor-pointer" : ""} ${expanded ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--warm-glow)]"} ${compact ? "py-1.5" : "py-2"}`}
+      >
+        <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+          {cost > 0 && (
+            <ChevronRight size={12} className={`shrink-0 text-[var(--fg-muted)] transition-transform ${expanded ? "rotate-90" : ""}`} />
+          )}
+          <span className={`font-semibold ${isDone ? "text-[var(--fg-muted)] line-through" : "text-[var(--fg)]"} ${compact ? "text-xs" : "text-sm"}`}>{tr(node.name)}</span>
+          {node.vendor?.name && <span className="text-xs text-[var(--fg-muted)]">{tr(node.vendor.name)}</span>}
+          {(node.category?.name || node.nodeType) && (
+            <span className="rounded bg-[var(--accent-soft)] px-1.5 py-px text-[8px] font-bold uppercase text-[var(--accent)]">
+              {node.category?.name ? tr(node.category.name) : node.nodeType}
+            </span>
+          )}
+          <StatusBadge status={node.status} />
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          {cost > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold">
+              <span className="text-[var(--success)]">{fmt(paid)}</span>
+              <span className="text-[var(--fg-muted)]">/</span>
+              <span className="text-[var(--fg)]">{fmt(cost)}</span>
+              {paid > 0 && <span className="rounded-md bg-[var(--success-soft)] px-1.5 py-0.5 text-[9px] font-bold text-[var(--success)]">{pct}%</span>}
+              {remaining > 0 && <span className="text-[var(--alert)]">{fmt(remaining)} {t("task.left")}</span>}
+            </div>
+          )}
+
+          {/* Quick actions */}
+          {onMutate && (
+            <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+              {!isDone && (
+                <button onClick={handleMarkDone} className="rounded-md p-1 text-[var(--fg-muted)]/30 transition-all hover:bg-[var(--success-soft)] hover:text-[var(--success)]" title={t("task.markDone")}>
+                  <CheckCircle2 size={13} />
+                </button>
+              )}
+              {cost > 0 && !isFullyPaid && (
+                <button onClick={handleMarkPaid} className="rounded-md p-1 text-[var(--fg-muted)]/30 transition-all hover:bg-amber-50 hover:text-amber-600" title={t("task.markPaid")}>
+                  <CircleDollarSign size={13} />
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
-      {cost > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold">
-          <span className="text-[var(--success)]">{fmt(paid)}</span>
-          <span className="text-[var(--fg-muted)]">/</span>
-          <span className="text-[var(--fg)]">{fmt(cost)}</span>
-          {paid > 0 && <span className="rounded-md bg-[var(--success-soft)] px-1.5 py-0.5 text-[9px] font-bold text-[var(--success)]">{pct}%</span>}
-          {remaining > 0 && <span className="text-[var(--alert)]">{fmt(remaining)} {t("task.left")}</span>}
+      {/* Expanded: inline payments panel */}
+      {expanded && cost > 0 && (
+        <div className="ms-4 mb-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-2">
+          <ItemMilestones itemId={node.id} expectedCost={cost} onMutate={onMutate} />
         </div>
       )}
     </div>

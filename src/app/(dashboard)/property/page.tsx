@@ -36,6 +36,7 @@ export default function PropertyPage() {
   const fmt = (n: number) => new Intl.NumberFormat(lang === "he" ? "he-IL" : "en-IL", { style: "currency", currency: "ILS", maximumFractionDigits: 0 }).format(n);
 
   const mutateFloors = () => mutate(`/api/floors?projectId=${project.id}`);
+  const mutateAll = () => { mutateFloors(); mutate(`/api/nodes?projectId=${project?.id}`); mutate(`/api/projects/${project?.id}/milestones`); mutate(`/api/projects`); };
 
   const addFloor = async (e: React.FormEvent) => {
     e.preventDefault(); setError("");
@@ -237,7 +238,7 @@ export default function PropertyPage() {
                           }>
                             {roomTasks.length > 0 ? (
                               <div className="rounded-lg bg-[var(--bg)] p-2 space-y-0.5">
-                                {roomTasks.map((n: any) => <TaskLine key={n.id} node={n} tr={tr} compact />)}
+                                {roomTasks.map((n: any) => <TaskLine key={n.id} node={n} tr={tr} compact onMutate={mutateAll} />)}
                               </div>
                             ) : <p className="text-xs text-[var(--fg-muted)] py-1">—</p>}
                           </Expandable>

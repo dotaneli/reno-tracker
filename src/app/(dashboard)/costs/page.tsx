@@ -10,6 +10,7 @@ import { Card, StatCard } from "@/components/Card";
 import { Expandable } from "@/components/Expandable";
 import { TaskLine, MilestoneLine } from "@/components/TaskLine";
 import { StatusBadge } from "@/components/StatusBadge";
+import { mutate } from "swr";
 import { Wallet, TrendingUp, AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, PiggyBank, CircleDollarSign, CheckCircle2 } from "lucide-react";
 
 // ── SVG Donut Chart ──
@@ -69,6 +70,8 @@ export default function CostsPage() {
   const tr = useTranslate(allTexts);
   const fmt = (n: number) => new Intl.NumberFormat(lang === "he" ? "he-IL" : "en-IL", { style: "currency", currency: "ILS", maximumFractionDigits: 0 }).format(n);
 
+  const mutateAll = () => { mutate(`/api/nodes?projectId=${project?.id}`); mutate(`/api/nodes?projectId=${project?.id}&parentId=root`); mutate(`/api/projects/${project?.id}/milestones`); mutate(`/api/projects`); };
+
   const ms = fin.milestones;
   const costNodes = allNodes?.filter((n: any) => n.expectedCost) || [];
   const upcomingMilestones = fin.unpaidMilestones.filter((m: any) => m.dueDate).sort((a: any, b: any) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
@@ -101,7 +104,7 @@ export default function CostsPage() {
     // Pending: tasks with unpaid milestones
     const pendingGroups: { nodeId: string; name: string; cost: number; paid: number; remaining: number; unpaidMs: any[]; gap: number }[] = [];
     // Gap-only: tasks with all milestones paid but milestoned < cost
-    const gapGroups: { nodeId: string; name: string; cost: number; paid: number; gap: number }[] = [];
+    const gapGroups: { nodeId: string; name: string; cost: number; paid: number; gap: number; node: any }[] = [];
 
     for (const [nodeId, np] of nodePayments) {
       const node = (allNodes || []).find((n: any) => n.id === nodeId);
@@ -112,7 +115,7 @@ export default function CostsPage() {
         const remaining = np.unpaidMs.reduce((s: number, m: any) => s + Number(m.amount), 0) + gap;
         pendingGroups.push({ nodeId, name: np.unpaidMs[0]?.nodeName || node?.name || "—", cost, paid: np.paid, remaining, unpaidMs: np.unpaidMs, gap });
       } else if (gap > 0) {
-        gapGroups.push({ nodeId, name: node?.name || "—", cost, paid: np.paid, gap });
+        gapGroups.push({ nodeId, name: node?.name || "—", cost, paid: np.paid, gap, node });
       }
     }
 
@@ -183,7 +186,7 @@ export default function CostsPage() {
 
           <StatCard label={t("costs.totalCost")} value={fmt(fin.totalCost)} icon={<TrendingUp size={18} />}>
             <div className="max-h-32 overflow-y-auto space-y-0.5">
-              {costNodes.map((n: any) => <TaskLine key={n.id} node={n} tr={tr} compact />)}
+              {costNodes.map((n: any) => <TaskLine key={n.id} node={n} tr={tr} compact onMutate={mutateAll} />)}
             </div>
           </StatCard>
 
@@ -288,14 +291,13 @@ export default function CostsPage() {
               {unpaidData.gapGroups.length === 0 ? (
                 <p className="text-xs text-[var(--fg-muted)] py-2">—</p>
               ) : unpaidData.gapGroups.map((g) => (
-                <Card key={g.nodeId} className="!p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0">
+                <Card key={g.nodeId} className="!p-2">
+                  {g.node ? <TaskLine node={g.node} tr={tr} compact onMutate={mutateAll} /> : (
+                    <div className="flex items-center justify-between gap-2 px-2 py-1.5">
                       <p className="text-xs font-semibold text-[var(--fg)]">{tr(g.name)}</p>
-                      <p className="text-[10px] text-[var(--fg-muted)]">{fmt(g.paid)} / {fmt(g.cost)}</p>
+                      <p className="text-xs font-bold text-amber-600">{fmt(g.gap)}</p>
                     </div>
-                    <p className="text-xs font-bold text-amber-600">{fmt(g.gap)} <span className="font-normal text-[var(--fg-muted)]">({fmt(g.cost)})</span></p>
-                  </div>
+                  )}
                 </Card>
               ))}
             </div>
@@ -309,14 +311,8 @@ export default function CostsPage() {
               {unpaidData.noPaymentTasks.length === 0 ? (
                 <p className="text-xs text-[var(--fg-muted)] py-2">—</p>
               ) : unpaidData.noPaymentTasks.map((n: any) => (
-                <Card key={n.id} className="!p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold text-[var(--fg)]">{tr(n.name)}</p>
-                      <p className="text-[10px] text-[var(--fg-muted)]">{n.vendor?.name ? tr(n.vendor.name) : ""}{n.category?.name ? ` · ${tr(n.category.name)}` : ""}</p>
-                    </div>
-                    <p className="text-xs font-bold text-[var(--alert)]">{fmt(Number(n.expectedCost))}</p>
-                  </div>
+                <Card key={n.id} className="!p-2">
+                  <TaskLine node={n} tr={tr} compact onMutate={mutateAll} />
                 </Card>
               ))}
             </div>
@@ -343,7 +339,7 @@ export default function CostsPage() {
                   <div className="space-y-2">
                     <div className="rounded-lg bg-[var(--bg)] p-2">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--fg-muted)] mb-1">{t("dash.tasks")}</p>
-                      {sp.nodes.map((n: any) => <TaskLine key={n.id} node={n} tr={tr} compact />)}
+                      {sp.nodes.map((n: any) => <TaskLine key={n.id} node={n} tr={tr} compact onMutate={mutateAll} />)}
                     </div>
                     <div className="rounded-lg bg-[var(--bg)] p-2">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--fg-muted)] mb-1">{t("task.milestones")}</p>
@@ -373,7 +369,7 @@ export default function CostsPage() {
                   </div>
                 }>
                   <div className="rounded-lg bg-[var(--bg)] p-2">
-                    {allNodes?.find((n: any) => n.id === m.nodeId) && <TaskLine node={allNodes.find((n: any) => n.id === m.nodeId)} tr={tr} compact />}
+                    {allNodes?.find((n: any) => n.id === m.nodeId) && <TaskLine node={allNodes.find((n: any) => n.id === m.nodeId)} tr={tr} compact onMutate={mutateAll} />}
                   </div>
                 </Expandable>
               </Card>
@@ -396,7 +392,7 @@ export default function CostsPage() {
                   </div>
                 }>
                   <div className="rounded-lg bg-[var(--bg)] p-2">
-                    {allNodes?.find((n: any) => n.id === m.nodeId) && <TaskLine node={allNodes.find((n: any) => n.id === m.nodeId)} tr={tr} compact />}
+                    {allNodes?.find((n: any) => n.id === m.nodeId) && <TaskLine node={allNodes.find((n: any) => n.id === m.nodeId)} tr={tr} compact onMutate={mutateAll} />}
                   </div>
                 </Expandable>
               </Card>

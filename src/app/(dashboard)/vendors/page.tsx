@@ -29,6 +29,7 @@ export default function VendorsPage() {
   const tr = useTranslate(allTexts);
   const fmt = (n: number) => new Intl.NumberFormat(lang === "he" ? "he-IL" : "en-IL", { style: "currency", currency: "ILS", maximumFractionDigits: 0 }).format(n);
   const mutateVendors = () => mutate(`/api/vendors?projectId=${project?.id}`);
+  const mutateAll = () => { mutateVendors(); mutate(`/api/nodes?projectId=${project?.id}`); mutate(`/api/projects/${project?.id}/milestones`); mutate(`/api/projects`); };
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault(); setError(""); if (!project) return;
@@ -169,7 +170,7 @@ export default function VendorsPage() {
                   </div>
                 }>
                   {v.nodes.length > 0 ? (
-                    <div className="space-y-0.5 rounded-lg bg-[var(--bg)] p-2">{v.nodes.map((n: any) => <TaskLine key={n.id} node={n} tr={tr} compact />)}</div>
+                    <div className="space-y-0.5 rounded-lg bg-[var(--bg)] p-2">{v.nodes.map((n: any) => <TaskLine key={n.id} node={n} tr={tr} compact onMutate={mutateAll} />)}</div>
                   ) : <p className="text-xs text-[var(--fg-muted)] py-2">—</p>}
                 </Expandable>
               )}

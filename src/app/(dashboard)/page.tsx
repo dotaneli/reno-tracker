@@ -10,6 +10,7 @@ import { Expandable } from "@/components/Expandable";
 import { TaskLine, MilestoneLine } from "@/components/TaskLine";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useRouter } from "next/navigation";
+import { mutate } from "swr";
 import { AlertTriangle, Wallet, Layers, Package, TrendingUp, CalendarDays, ArrowUpRight, PiggyBank } from "lucide-react";
 
 export default function DashboardPage() {
@@ -19,6 +20,8 @@ export default function DashboardPage() {
   const { data: nodes } = useApi<any[]>(project ? `/api/nodes?projectId=${project.id}` : null);
   const { data: issues } = useApi<any[]>(project ? "/api/issues" : null);
   const fin = useFinancials(project?.id);
+
+  const mutateAll = () => { mutate(`/api/nodes?projectId=${project?.id}`); mutate(`/api/projects/${project?.id}/milestones`); mutate(`/api/projects`); mutate(`/api/issues`); };
 
   const rootNodes = nodes?.filter((n: any) => !n.parentId) || [];
   const leafNodes = nodes?.filter((n: any) => n.parentId) || [];
@@ -113,12 +116,12 @@ export default function DashboardPage() {
       <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
         <StatCard label={t("dash.groups")} value={rootNodes.length} icon={<Layers size={18} />}>
           <div className="max-h-48 overflow-y-auto space-y-0.5">
-            {rootNodes.map((n: any) => <TaskLine key={n.id} node={n} tr={tr} compact />)}
+            {rootNodes.map((n: any) => <TaskLine key={n.id} node={n} tr={tr} compact onMutate={mutateAll} />)}
           </div>
         </StatCard>
         <StatCard label={t("dash.tasks")} value={leafNodes.length} icon={<Package size={18} />}>
           <div className="max-h-48 overflow-y-auto space-y-0.5">
-            {leafNodes.slice(0, 15).map((n: any) => <TaskLine key={n.id} node={n} tr={tr} compact />)}
+            {leafNodes.slice(0, 15).map((n: any) => <TaskLine key={n.id} node={n} tr={tr} compact onMutate={mutateAll} />)}
             {leafNodes.length > 15 && <p className="text-xs text-[var(--fg-muted)] pt-1">{leafNodes.length - 15} more...</p>}
           </div>
         </StatCard>
@@ -147,7 +150,7 @@ export default function DashboardPage() {
               }>
                 <div className="rounded-lg bg-[var(--bg)] p-3 text-xs space-y-2">
                   {issue.description && <p className="text-[var(--fg-muted)]">{tr(issue.description)}</p>}
-                  {issue.node && <TaskLine node={issue.node} tr={tr} compact />}
+                  {issue.node && <TaskLine node={issue.node} tr={tr} compact onMutate={mutateAll} />}
                   <button onClick={() => router.push("/issues")} className="flex items-center gap-1 text-[var(--accent)] font-medium hover:underline">
                     <ArrowUpRight size={12} />{t("nav.issues")}
                   </button>
