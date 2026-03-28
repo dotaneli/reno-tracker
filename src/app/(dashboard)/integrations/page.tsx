@@ -23,15 +23,18 @@ const input =
   "w-full rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] px-4 py-3 text-sm text-[var(--fg)] placeholder-[var(--fg-muted)]/60 outline-none transition-all focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/10";
 
 const PLATFORMS = [
-  { id: "chatgpt", name: "ChatGPT", icon: MessageSquare, color: "#10a37f", desc: "OpenAI" },
-  { id: "gemini", name: "Gemini", icon: Sparkles, color: "#4285f4", desc: "Google" },
-  { id: "claude", name: "Claude", icon: Bot, color: "#b8956a", desc: "Anthropic" },
+  { id: "claude", name: "Claude", icon: Bot, color: "#b8956a", desc: "Anthropic — Easiest setup", tag: "Recommended" },
+  { id: "chatgpt", name: "ChatGPT", icon: MessageSquare, color: "#10a37f", desc: "OpenAI — Requires Plus ($20/mo)", tag: "" },
+  { id: "gemini", name: "Gemini CLI", icon: Sparkles, color: "#4285f4", desc: "Google — Requires terminal", tag: "" },
 ] as const;
 
 type SetupData = {
   platform: string;
+  requirement?: string;
+  note?: string;
   steps: { step: number; title: string; description: string; copyable?: string }[];
   key: string;
+  mcpUrl?: string;
 };
 
 export default function IntegrationsPage() {
@@ -97,9 +100,14 @@ export default function IntegrationsPage() {
 
       {/* Platform Cards */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        {PLATFORMS.map(({ id, name, icon: Icon, color, desc }) => (
+        {PLATFORMS.map(({ id, name, icon: Icon, color, desc, tag }) => (
           <Card key={id} glow>
             <div className="flex flex-col items-center gap-3 py-2 text-center">
+              {tag && (
+                <span className="rounded-full bg-[var(--success-soft)] px-2.5 py-0.5 text-[10px] font-bold text-[var(--success)]">
+                  {tag}
+                </span>
+              )}
               <div className="rounded-xl p-3" style={{ backgroundColor: `${color}15` }}>
                 <Icon size={28} style={{ color }} />
               </div>
@@ -134,6 +142,18 @@ export default function IntegrationsPage() {
                 ✕
               </button>
             </div>
+
+            {setupData.requirement && (
+              <div className="rounded-xl bg-[var(--accent-soft)] p-2.5">
+                <p className="text-xs text-[var(--fg-secondary)]">{setupData.requirement}</p>
+              </div>
+            )}
+
+            {setupData.note && (
+              <div className="rounded-xl border border-blue-200 bg-blue-50 p-2.5">
+                <p className="text-xs text-blue-800">{setupData.note}</p>
+              </div>
+            )}
 
             {/* API Key Warning */}
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">

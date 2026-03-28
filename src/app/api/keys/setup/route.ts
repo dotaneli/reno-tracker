@@ -34,17 +34,52 @@ Key API patterns:
 
 All requests need header: Authorization: Bearer ${keyPlaintext}`;
 
+  const mcpUrl = `${apiUrl}/api/agent/mcp`;
+
   switch (platform) {
     case "chatgpt":
       return {
         platform: "ChatGPT",
+        requirement: "ChatGPT Plus subscription ($20/month) required to create Custom GPTs",
         steps: [
-          { step: 1, title: "Open ChatGPT", description: "Go to chatgpt.com → Explore GPTs → Create a GPT" },
-          { step: 2, title: "Configure Actions", description: "In Configure tab → scroll to Actions → Create new action" },
-          { step: 3, title: "Import Schema", description: `Click "Import from URL" and paste this URL`, copyable: `${apiUrl}/api/openapi.json` },
-          { step: 4, title: "Set Authentication", description: "Authentication → API Key → Auth Type: Bearer → paste your key", copyable: keyPlaintext },
-          { step: 5, title: "Set Instructions", description: "Paste this as the GPT instructions", copyable: systemPrompt },
-          { step: 6, title: "Test It", description: 'Try saying: "Show me my renovation projects"' },
+          {
+            step: 1,
+            title: "Open the GPT Builder",
+            description: "Go to chatgpt.com → click \"Explore GPTs\" in the sidebar → click \"Create\" (top right). Or go directly to chatgpt.com/create",
+          },
+          {
+            step: 2,
+            title: "Switch to Configure tab",
+            description: "At the top of the builder you'll see two tabs: \"Create\" and \"Configure\". Click \"Configure\" for manual setup.",
+          },
+          {
+            step: 3,
+            title: "Set the Instructions",
+            description: "In the \"Instructions\" field, paste this system prompt. This tells your GPT how to interact with your renovation project.",
+            copyable: systemPrompt,
+          },
+          {
+            step: 4,
+            title: "Scroll down to Actions → Create new action",
+            description: "At the bottom of the Configure tab, find \"Actions\" and click \"Create new action\". This opens the Actions editor.",
+          },
+          {
+            step: 5,
+            title: "Import the API schema",
+            description: "In the Actions editor, click \"Import from URL\" and paste this URL. It will auto-detect all available API endpoints.",
+            copyable: `${apiUrl}/api/openapi.json`,
+          },
+          {
+            step: 6,
+            title: "Set Authentication",
+            description: "Click the gear icon (⚙️) next to Authentication. Select \"API Key\", set Auth Type to \"Bearer\", and paste your key.",
+            copyable: keyPlaintext,
+          },
+          {
+            step: 7,
+            title: "Save & Test",
+            description: "Click \"Save\" (choose \"Only me\" for now). Then try saying: \"Show me my renovation projects\"",
+          },
         ],
         systemPrompt,
         openApiUrl: `${apiUrl}/api/openapi.json`,
@@ -54,33 +89,88 @@ All requests need header: Authorization: Bearer ${keyPlaintext}`;
     case "gemini":
       return {
         platform: "Gemini",
+        requirement: "Gemini Gems cannot make HTTP calls. Use the Gemini CLI (free, runs on your computer) which supports MCP natively.",
         steps: [
-          { step: 1, title: "Open Google AI Studio", description: "Go to aistudio.google.com (not gemini.google.com — Gems cannot make HTTP calls)" },
-          { step: 2, title: "Create a New Prompt", description: 'Click "Create New" → choose "Structured prompt" or "Freeform"' },
-          { step: 3, title: "Add System Instructions", description: "Paste this as the system instruction — it includes your API key and all available endpoints", copyable: systemPrompt },
-          { step: 4, title: "Enable Function Calling", description: 'In the right panel, enable "Tools" → "Code execution" so Gemini can make HTTP requests' },
-          { step: 5, title: "Test It", description: 'Try: "Fetch my renovation projects from the API and show me the status"' },
+          {
+            step: 1,
+            title: "Install the Gemini CLI",
+            description: "Open your terminal and run this command to install the Gemini CLI.",
+            copyable: "npm install -g @anthropic-ai/gemini-cli",
+          },
+          {
+            step: 2,
+            title: "Add Reno Tracker as an MCP server",
+            description: "Create or edit the file ~/.gemini/settings.json and add this configuration.",
+            copyable: JSON.stringify({
+              mcpServers: {
+                "reno-tracker": {
+                  httpUrl: mcpUrl,
+                  headers: { Authorization: `Bearer ${keyPlaintext}` },
+                },
+              },
+            }, null, 2),
+          },
+          {
+            step: 3,
+            title: "Start the Gemini CLI",
+            description: "Run \"gemini\" in your terminal. Type /mcp to verify the connection shows \"reno-tracker\" with 16 tools.",
+          },
+          {
+            step: 4,
+            title: "Test It",
+            description: "Try saying: \"Show me my renovation projects and their status\"",
+          },
         ],
-        systemPrompt,
-        note: "Important: Regular Gemini Gems cannot make HTTP calls. Use Google AI Studio with code execution enabled, or use ChatGPT Custom GPTs for the easiest experience.",
+        note: "Gemini Gems (gemini.google.com) cannot connect to external APIs. The Gemini CLI is the recommended way to use Gemini with Reno Tracker. Alternatively, use ChatGPT or Claude for a browser-based experience.",
+        mcpUrl,
         key: keyPlaintext,
       };
 
     case "claude":
       return {
         platform: "Claude",
+        requirement: "Claude Pro, Max, Team, or Enterprise plan required for custom connectors",
         steps: [
-          { step: 1, title: "Open Claude", description: "Go to claude.ai" },
-          { step: 2, title: "Create a Project", description: 'Click Projects → Create Project → name it "Reno Tracker"' },
-          { step: 3, title: "Set Project Instructions", description: "In project settings, paste this as the system prompt", copyable: systemPrompt },
-          { step: 4, title: "Test It", description: 'Start a chat in the project and say: "Show me my renovation projects"' },
+          {
+            step: 1,
+            title: "Open Claude Settings",
+            description: "Go to claude.ai → click your profile icon (bottom-left) → Settings",
+          },
+          {
+            step: 2,
+            title: "Go to Connectors",
+            description: "In Settings, click \"Connectors\" in the sidebar",
+          },
+          {
+            step: 3,
+            title: "Add Custom Connector",
+            description: "Scroll down and click \"Add custom connector\". Paste this MCP server URL.",
+            copyable: mcpUrl,
+          },
+          {
+            step: 4,
+            title: "Name it and add authentication",
+            description: "Name it \"Reno Tracker\". If prompted for authentication headers, add: Authorization: Bearer <your key>. Click \"Add\".",
+            copyable: `Bearer ${keyPlaintext}`,
+          },
+          {
+            step: 5,
+            title: "Enable in a conversation",
+            description: "Start a new chat. Click the \"+\" button at the bottom, select \"Connectors\", and toggle on \"Reno Tracker\".",
+          },
+          {
+            step: 6,
+            title: "Test It",
+            description: "Try saying: \"Show me my renovation projects and what's in progress\"",
+          },
         ],
-        systemPrompt,
+        note: "You can also use Claude Code: run \"claude mcp add --transport http reno-tracker " + mcpUrl + " --header 'Authorization: Bearer " + keyPlaintext + "'\"",
+        mcpUrl,
         key: keyPlaintext,
       };
 
     default:
-      return { platform, systemPrompt, key: keyPlaintext };
+      return { platform, systemPrompt, mcpUrl, key: keyPlaintext };
   }
 }
 
