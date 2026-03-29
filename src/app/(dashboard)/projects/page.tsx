@@ -57,7 +57,7 @@ export default function ProjectsPage() {
         <Card glow>
           <form onSubmit={handleCreate} className="space-y-3">
             <input type="text" placeholder={t("proj.name")} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required className={input} />
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <input type="number" placeholder={`${t("proj.budget")} (₪)`} value={form.totalBudget} onChange={(e) => setForm({ ...form, totalBudget: e.target.value })} required className={input} />
               <input type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} className={input} placeholder={t("proj.startDate")} />
               <input type="date" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} className={input} placeholder={t("proj.endDate")} />

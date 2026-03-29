@@ -128,9 +128,9 @@ export function Nav() {
   const shareBtn = "flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[11px] font-medium text-[var(--fg-secondary)] transition-all hover:bg-[var(--warm-glow)] hover:text-[var(--fg)] disabled:opacity-40";
 
   return (
-    <nav className="flex gap-1 overflow-x-auto bg-[var(--bg-elevated)] px-3 py-2 md:flex-col md:border-e md:border-[var(--border-subtle)] md:px-3 md:py-4 md:h-[calc(100vh-64px)] md:sticky md:top-16 md:overflow-y-auto">
+    <nav className="flex flex-col gap-1 overflow-x-auto bg-[var(--bg-elevated)] px-3 py-2 md:border-e md:border-[var(--border-subtle)] md:px-3 md:py-4 md:h-[calc(100vh-64px)] md:sticky md:top-16 md:overflow-y-auto">
       {/* Nav links */}
-      <div className="flex gap-1 md:flex-col md:gap-0.5 md:flex-1">
+      <div className="flex gap-1 overflow-x-auto md:flex-col md:gap-0.5 md:flex-1">
         <div className="hidden px-3 pb-3 md:block">
           <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[var(--fg-muted)]">
             {t("nav.dashboard")}
@@ -155,34 +155,61 @@ export function Nav() {
         })}
       </div>
 
-      {/* Share/Export — sticky bottom of sidebar */}
+      {/* Share/Export — sticky bottom on desktop, horizontal row on mobile */}
       {projectId && (
-        <div className="hidden md:block border-t border-[var(--border-subtle)] pt-2 mt-auto shrink-0">
-          <p className="px-2.5 mb-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-[var(--fg-muted)]">
-            {t("export.title")}
-          </p>
-          <button onClick={() => downloadFile("csv", "xlsx")} disabled={!!loading} className={shareBtn}>
-            <FileSpreadsheet size={13} className="text-[#0F9D58]" />
-            {done === "csv" ? <><Check size={11} className="text-[var(--success)]" /></> : loading === "csv" ? "..." : t("export.sheets")}
-          </button>
-          <button onClick={() => downloadFile("html", "html")} disabled={!!loading} className={shareBtn}>
-            <FileText size={13} className="text-[#4285F4]" />
-            {done === "html" ? <><Check size={11} className="text-[var(--success)]" /></> : loading === "html" ? "..." : t("export.docs")}
-          </button>
-          <button onClick={shareWhatsApp} disabled={!!loading} className={shareBtn}>
-            <MessageCircle size={13} className="text-[#25D366]" />
-            {done === "whatsapp" ? <><Check size={11} className="text-[var(--success)]" /></> : loading === "whatsapp" ? "..." : t("export.whatsapp")}
-          </button>
-          <div className="flex gap-0.5">
-            <button onClick={() => generateInfographic("copy")} disabled={!!loading} className={`${shareBtn} flex-1`}>
-              <Copy size={13} className="text-[var(--accent)]" />
-              {done === "copy" ? <><Check size={11} className="text-[var(--success)]" /></> : loading === "image" ? "..." : t("export.png")}
+        <>
+          {/* Mobile: horizontal scrollable row below nav */}
+          <div className="flex md:hidden items-center gap-1.5 border-t border-[var(--border-subtle)] px-2 py-1.5 overflow-x-auto shrink-0">
+            <span className="text-[9px] font-semibold uppercase tracking-wider text-[var(--fg-muted)] whitespace-nowrap">{t("export.title")}</span>
+            <button onClick={() => downloadFile("csv", "xlsx")} disabled={!!loading} className="flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-[11px] font-medium text-[var(--fg-secondary)] whitespace-nowrap hover:bg-[var(--warm-glow)]">
+              <FileSpreadsheet size={13} className="text-[#0F9D58]" />
+              {done === "csv" ? <Check size={11} className="text-[var(--success)]" /> : loading === "csv" ? "..." : t("export.sheets")}
             </button>
-            <button onClick={() => generateInfographic("download")} disabled={!!loading} className="rounded-lg p-1.5 text-[var(--fg-muted)]/30 transition-all hover:bg-[var(--warm-glow)] hover:text-[var(--fg)] disabled:opacity-40">
+            <button onClick={() => downloadFile("html", "html")} disabled={!!loading} className="flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-[11px] font-medium text-[var(--fg-secondary)] whitespace-nowrap hover:bg-[var(--warm-glow)]">
+              <FileText size={13} className="text-[#4285F4]" />
+              {done === "html" ? <Check size={11} className="text-[var(--success)]" /> : loading === "html" ? "..." : t("export.docs")}
+            </button>
+            <button onClick={shareWhatsApp} disabled={!!loading} className="flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-[11px] font-medium text-[var(--fg-secondary)] whitespace-nowrap hover:bg-[var(--warm-glow)]">
+              <MessageCircle size={13} className="text-[#25D366]" />
+              {done === "whatsapp" ? <Check size={11} className="text-[var(--success)]" /> : loading === "whatsapp" ? "..." : t("export.whatsapp")}
+            </button>
+            <button onClick={() => generateInfographic("copy")} disabled={!!loading} className="flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-[11px] font-medium text-[var(--fg-secondary)] whitespace-nowrap hover:bg-[var(--warm-glow)]">
+              <Copy size={13} className="text-[var(--accent)]" />
+              {done === "copy" ? <Check size={11} className="text-[var(--success)]" /> : loading === "image" ? "..." : t("export.png")}
+            </button>
+            <button onClick={() => generateInfographic("download")} disabled={!!loading} className="rounded-lg p-2 text-[var(--fg-muted)]/30 hover:bg-[var(--warm-glow)] hover:text-[var(--fg)] disabled:opacity-40">
               {done === "download" ? <Check size={13} className="text-[var(--success)]" /> : <Download size={13} />}
             </button>
           </div>
-        </div>
+
+          {/* Desktop: vertical list at bottom of sidebar */}
+          <div className="hidden md:block border-t border-[var(--border-subtle)] pt-2 mt-auto shrink-0">
+            <p className="px-2.5 mb-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-[var(--fg-muted)]">
+              {t("export.title")}
+            </p>
+            <button onClick={() => downloadFile("csv", "xlsx")} disabled={!!loading} className={shareBtn}>
+              <FileSpreadsheet size={13} className="text-[#0F9D58]" />
+              {done === "csv" ? <><Check size={11} className="text-[var(--success)]" /></> : loading === "csv" ? "..." : t("export.sheets")}
+            </button>
+            <button onClick={() => downloadFile("html", "html")} disabled={!!loading} className={shareBtn}>
+              <FileText size={13} className="text-[#4285F4]" />
+              {done === "html" ? <><Check size={11} className="text-[var(--success)]" /></> : loading === "html" ? "..." : t("export.docs")}
+            </button>
+            <button onClick={shareWhatsApp} disabled={!!loading} className={shareBtn}>
+              <MessageCircle size={13} className="text-[#25D366]" />
+              {done === "whatsapp" ? <><Check size={11} className="text-[var(--success)]" /></> : loading === "whatsapp" ? "..." : t("export.whatsapp")}
+            </button>
+            <div className="flex gap-0.5">
+              <button onClick={() => generateInfographic("copy")} disabled={!!loading} className={`${shareBtn} flex-1`}>
+                <Copy size={13} className="text-[var(--accent)]" />
+                {done === "copy" ? <><Check size={11} className="text-[var(--success)]" /></> : loading === "image" ? "..." : t("export.png")}
+              </button>
+              <button onClick={() => generateInfographic("download")} disabled={!!loading} className="rounded-lg p-1.5 text-[var(--fg-muted)]/30 transition-all hover:bg-[var(--warm-glow)] hover:text-[var(--fg)] disabled:opacity-40">
+                {done === "download" ? <Check size={13} className="text-[var(--success)]" /> : <Download size={13} />}
+              </button>
+            </div>
+          </div>
+        </>
       )}
     </nav>
   );

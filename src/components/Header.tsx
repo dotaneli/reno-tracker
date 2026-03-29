@@ -122,7 +122,7 @@ export function Header({ user }: HeaderProps) {
               <button
                 onClick={handleUndo}
                 disabled={undoLoading}
-                className="rounded-lg p-2 transition-all disabled:opacity-30 disabled:cursor-not-allowed text-[var(--fg-muted)] hover:bg-[var(--border-subtle)] hover:text-[var(--fg)] disabled:hover:bg-transparent disabled:hover:text-[var(--fg-muted)]"
+                className="rounded-lg p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed text-[var(--fg-muted)] hover:bg-[var(--border-subtle)] hover:text-[var(--fg)] disabled:hover:bg-transparent disabled:hover:text-[var(--fg-muted)]"
                 title={undoTitle}
               >
                 <Undo2 size={16} />
@@ -130,7 +130,7 @@ export function Header({ user }: HeaderProps) {
               <button
                 onClick={handleRedo}
                 disabled={redoLoading}
-                className="rounded-lg p-2 transition-all disabled:opacity-30 disabled:cursor-not-allowed text-[var(--fg-muted)] hover:bg-[var(--border-subtle)] hover:text-[var(--fg)] disabled:hover:bg-transparent disabled:hover:text-[var(--fg-muted)]"
+                className="rounded-lg p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed text-[var(--fg-muted)] hover:bg-[var(--border-subtle)] hover:text-[var(--fg)] disabled:hover:bg-transparent disabled:hover:text-[var(--fg-muted)]"
                 title={redoTitle}
               >
                 <Redo2 size={16} />
@@ -162,7 +162,7 @@ export function Header({ user }: HeaderProps) {
               <div className="hidden md:block">
                 <p className="text-xs font-medium text-[var(--fg)]">{user.name}</p>
               </div>
-              <a href="/api/auth/signout" className="rounded-lg p-2 text-[var(--fg-muted)] transition-all hover:bg-[var(--border-subtle)] hover:text-[var(--fg)]" title={t("nav.signOut")}>
+              <a href="/api/auth/signout" className="rounded-lg p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-[var(--fg-muted)] transition-all hover:bg-[var(--border-subtle)] hover:text-[var(--fg)]" title={t("nav.signOut")}>
                 <LogOut size={16} />
               </a>
             </div>

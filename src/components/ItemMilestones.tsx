@@ -125,8 +125,8 @@ export function ItemMilestones({ itemId, expectedCost, onMutate: onParentMutate 
             </form>
           ) : (
             /* ── Normal display ── */
-            <div className="lift flex items-center justify-between gap-3 rounded-lg bg-[var(--bg)] p-3">
-              <div className="min-w-0 flex-1">
+            <div className="lift flex flex-wrap items-center justify-between gap-2 rounded-lg bg-[var(--bg)] p-3">
+              <div className="min-w-0 flex-1 basis-[140px]">
                 <div className="flex items-center gap-2">
                   <p className="text-xs font-semibold text-[var(--fg)]">{m.label}</p>
                   {m.percentage && <span className="text-[10px] text-[var(--fg-muted)]">({m.percentage}%)</span>}
@@ -141,17 +141,17 @@ export function ItemMilestones({ itemId, expectedCost, onMutate: onParentMutate 
                   )}
                 </div>
               </div>
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1">
                 <StatusBadge status={m.status} />
                 {m.status !== "PAID" && (
-                  <button onClick={() => markPaid(m.id)} className="rounded-lg bg-[var(--success-soft)] p-2 text-[var(--success)] transition-all hover:bg-[var(--success)] hover:text-white" title={t("costs.markPaid")}>
+                  <button onClick={() => markPaid(m.id)} className="rounded-lg bg-[var(--success-soft)] p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-[var(--success)] transition-all hover:bg-[var(--success)] hover:text-white" title={t("costs.markPaid")}>
                     <CheckCircle2 size={14} />
                   </button>
                 )}
-                <button onClick={() => editId === m.id ? setEditId(null) : startEdit(m)} className={`rounded-lg p-1.5 transition-all ${editId === m.id ? "bg-[var(--accent)] text-white hover:bg-[var(--alert)]" : "bg-[var(--fg)]/5 text-[var(--fg)] hover:bg-[var(--accent)] hover:text-white"}`} title={editId === m.id ? t("task.cancel") : t("crud.edit")}>
+                <button onClick={() => editId === m.id ? setEditId(null) : startEdit(m)} className={`rounded-lg p-2 min-w-[44px] min-h-[44px] flex items-center justify-center transition-all ${editId === m.id ? "bg-[var(--accent)] text-white hover:bg-[var(--alert)]" : "bg-[var(--fg)]/5 text-[var(--fg)] hover:bg-[var(--accent)] hover:text-white"}`} title={editId === m.id ? t("task.cancel") : t("crud.edit")}>
                   {editId === m.id ? <X size={12} /> : <Pencil size={12} />}
                 </button>
-                <button onClick={() => deleteMilestone(m.id)} className="rounded-lg bg-[var(--fg)]/5 p-1.5 text-[var(--fg)] transition-all hover:bg-[var(--alert)] hover:text-white">
+                <button onClick={() => deleteMilestone(m.id)} className="rounded-lg bg-[var(--fg)]/5 p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-[var(--fg)] transition-all hover:bg-[var(--alert)] hover:text-white">
                   <Trash2 size={12} />
                 </button>
               </div>

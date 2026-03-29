@@ -94,14 +94,14 @@ export default function PropertyPage() {
           <h1 className="text-2xl font-bold tracking-tight text-[var(--fg)]">{t("prop.title")}</h1>
           <p className="mt-0.5 text-sm text-[var(--fg-muted)]">{floors?.length ?? 0} {t("prop.floors").toLowerCase()} · {totalRooms} {t("task.rooms").toLowerCase()}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button onClick={() => setRoomForm({ ...roomForm, show: !roomForm.show })}
-            className="flex items-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-[var(--accent)]/20 hover:bg-[var(--accent-hover)]">
-            <DoorOpen size={16} />{t("prop.addRoom")}
+            className="flex items-center gap-1.5 rounded-xl bg-[var(--accent)] px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold text-white shadow-md shadow-[var(--accent)]/20 hover:bg-[var(--accent-hover)]">
+            <DoorOpen size={14} />{t("prop.addRoom")}
           </button>
           <button onClick={() => setFloorForm({ ...floorForm, show: !floorForm.show })}
-            className="flex items-center gap-2 rounded-xl bg-[var(--fg)] px-4 py-2.5 text-sm font-semibold text-[var(--bg-elevated)] shadow-lg shadow-[var(--fg)]/10">
-            <Plus size={16} />{t("prop.addFloor")}
+            className="flex items-center gap-1.5 rounded-xl bg-[var(--fg)] px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold text-[var(--bg-elevated)] shadow-lg shadow-[var(--fg)]/10">
+            <Plus size={14} />{t("prop.addFloor")}
           </button>
         </div>
       </div>

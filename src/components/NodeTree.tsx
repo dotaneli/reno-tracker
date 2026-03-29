@@ -167,7 +167,7 @@ function NodeRow({ node, depth = 0, projectId, vendors, categories, floors, allN
             <button {...dragListeners} className="cursor-grab rounded-md p-2 text-[var(--fg-muted)]/30 hover:text-[var(--fg)] active:cursor-grabbing" style={{ touchAction: "none" }}>
               <GripVertical size={16} />
             </button>
-            <button onClick={() => setExpanded(!expanded)} className="rounded-md p-1 text-[var(--fg-muted)]/40 hover:text-[var(--fg-muted)]">
+            <button onClick={() => setExpanded(!expanded)} className="rounded-md p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-[var(--fg-muted)]/40 hover:text-[var(--fg-muted)]">
               <ChevronRight size={14} className={`transition-transform ${expanded && hasChildren ? "rotate-90" : ""} ${!hasChildren ? "opacity-0" : ""}`} />
             </button>
           </div>
@@ -176,7 +176,7 @@ function NodeRow({ node, depth = 0, projectId, vendors, categories, floors, allN
           <div className="min-w-0 flex-1">
             {/* Name + badges */}
             <div className="flex flex-wrap items-center gap-1.5">
-              <p className={`font-semibold ${depth === 0 ? "text-sm" : "text-xs"} ${isDone ? "text-[var(--fg-muted)] line-through" : "text-[var(--fg)]"}`}>{tr(node.name)}</p>
+              <p className={`font-semibold min-w-0 break-words ${depth === 0 ? "text-sm" : "text-xs"} ${isDone ? "text-[var(--fg-muted)] line-through" : "text-[var(--fg)]"}`}>{tr(node.name)}</p>
               {(node.category?.name || node.nodeType) && (
                 <span className="rounded bg-[var(--accent-soft)] px-1.5 py-px text-[8px] font-bold uppercase tracking-wider text-[var(--accent)]">
                   {node.category?.name ? tr(node.category.name) : t(`type.${node.nodeType}` as TKey)}
@@ -211,12 +211,12 @@ function NodeRow({ node, depth = 0, projectId, vendors, categories, floors, allN
           {/* Actions — wrap on mobile */}
           <div className="flex shrink-0 flex-wrap items-center gap-1 ms-auto">
             {!isDone && (
-              <button onClick={handleMarkDone} className="rounded-lg bg-[var(--success-soft)] p-1.5 text-[var(--success)] hover:bg-[var(--success)] hover:text-white" title={t("task.markDone")}>
+              <button onClick={handleMarkDone} className="rounded-lg bg-[var(--success-soft)] p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-[var(--success)] hover:bg-[var(--success)] hover:text-white" title={t("task.markDone")}>
                 <CheckCircle2 size={14} />
               </button>
             )}
             {hasCost && totalPaid < totalCost && (
-              <button onClick={handleMarkPaid} className="rounded-lg bg-amber-50 p-1.5 text-amber-600 hover:bg-amber-500 hover:text-white" title={t("task.markPaid")}>
+              <button onClick={handleMarkPaid} className="rounded-lg bg-amber-50 p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-amber-600 hover:bg-amber-500 hover:text-white" title={t("task.markPaid")}>
                 <CircleDollarSign size={14} />
               </button>
             )}
@@ -225,13 +225,13 @@ function NodeRow({ node, depth = 0, projectId, vendors, categories, floors, allN
                 {t("task.milestones")}
               </button>
             )}
-            <button onClick={() => { setAdding(!adding); setExpanded(true); }} className="rounded-lg bg-[var(--fg)]/5 p-1.5 text-[var(--fg)] hover:bg-[var(--fg)] hover:text-[var(--bg-elevated)]"><Plus size={14} /></button>
+            <button onClick={() => { setAdding(!adding); setExpanded(true); }} className="rounded-lg bg-[var(--fg)]/5 p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-[var(--fg)] hover:bg-[var(--fg)] hover:text-[var(--bg-elevated)]"><Plus size={14} /></button>
             {editNodeId === node.id ? (
-              <button onClick={() => onEditCancel?.()} className="rounded-lg bg-[var(--accent)] p-1.5 text-white hover:bg-[var(--alert)] hover:text-white" title={t("task.cancel")}><X size={13} /></button>
+              <button onClick={() => onEditCancel?.()} className="rounded-lg bg-[var(--accent)] p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-white hover:bg-[var(--alert)] hover:text-white" title={t("task.cancel")}><X size={13} /></button>
             ) : (
-              <button onClick={() => onEdit(node)} className="rounded-lg bg-[var(--fg)]/5 p-1.5 text-[var(--fg)] hover:bg-[var(--accent)] hover:text-white" title={t("crud.edit")}><Pencil size={13} /></button>
+              <button onClick={() => onEdit(node)} className="rounded-lg bg-[var(--fg)]/5 p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-[var(--fg)] hover:bg-[var(--accent)] hover:text-white" title={t("crud.edit")}><Pencil size={13} /></button>
             )}
-            <button onClick={handleDelete} className="rounded-lg bg-[var(--fg)]/5 p-1.5 text-[var(--fg)] hover:bg-[var(--alert)] hover:text-white"><Trash2 size={13} /></button>
+            <button onClick={handleDelete} className="rounded-lg bg-[var(--fg)]/5 p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-[var(--fg)] hover:bg-[var(--alert)] hover:text-white"><Trash2 size={13} /></button>
           </div>
         </div>
       </div>

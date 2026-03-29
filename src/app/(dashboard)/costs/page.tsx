@@ -14,7 +14,11 @@ import { mutate } from "swr";
 import { Wallet, TrendingUp, AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, PiggyBank, CircleDollarSign, CheckCircle2 } from "lucide-react";
 
 // ── SVG Donut Chart with hover tooltips + data labels ──
-function DonutChart({ segments, size = 200, strokeWidth = 32, fmt, totalLabel = "Total" }: { segments: { value: number; color: string; label: string }[]; size?: number; strokeWidth?: number; fmt: (n: number) => string; totalLabel?: string }) {
+function DonutChart({ segments, size: propSize = 200, strokeWidth: propStrokeWidth = 32, fmt, totalLabel = "Total" }: { segments: { value: number; color: string; label: string }[]; size?: number; strokeWidth?: number; fmt: (n: number) => string; totalLabel?: string }) {
+  // Use smaller size on mobile (< 640px)
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 640;
+  const size = isMobile ? Math.min(propSize, 160) : propSize;
+  const strokeWidth = isMobile ? Math.min(propStrokeWidth, 24) : propStrokeWidth;
   const [hover, setHover] = useState<number | null>(null);
   const total = segments.reduce((s, seg) => s + seg.value, 0);
   if (total === 0) return null;
@@ -56,29 +60,29 @@ function DonutChart({ segments, size = 200, strokeWidth = 32, fmt, totalLabel = 
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
           {hover !== null ? (
             <>
-              <p className="text-lg font-bold text-[var(--fg)]">{fmt(activeSegments[hover].value)}</p>
-              <p className="text-[10px] text-[var(--fg-muted)]">{activeSegments[hover].label}</p>
-              <p className="text-[10px] font-semibold" style={{ color: activeSegments[hover].color }}>{Math.round(activeSegments[hover].value / total * 100)}%</p>
+              <p className="text-sm sm:text-lg font-bold text-[var(--fg)]">{fmt(activeSegments[hover].value)}</p>
+              <p className="max-w-[80px] sm:max-w-none truncate text-center text-[9px] sm:text-[10px] text-[var(--fg-muted)]">{activeSegments[hover].label}</p>
+              <p className="text-[9px] sm:text-[10px] font-semibold" style={{ color: activeSegments[hover].color }}>{Math.round(activeSegments[hover].value / total * 100)}%</p>
             </>
           ) : (
             <>
-              <p className="text-lg font-bold text-[var(--fg)]">{fmt(total)}</p>
-              <p className="text-[10px] text-[var(--fg-muted)]">{totalLabel}</p>
+              <p className="text-sm sm:text-lg font-bold text-[var(--fg)]">{fmt(total)}</p>
+              <p className="text-[9px] sm:text-[10px] text-[var(--fg-muted)]">{totalLabel}</p>
             </>
           )}
         </div>
       </div>
       {/* Legend — clean, no amounts (detail shows on hover) */}
-      <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
+      <div className="flex flex-wrap justify-center gap-x-3 sm:gap-x-4 gap-y-1">
         {activeSegments.map((seg, i) => (
           <div
             key={i}
-            className={`flex items-center gap-1.5 text-[11px] cursor-pointer rounded-md px-1.5 py-0.5 transition-all ${hover === i ? "bg-[var(--warm-glow)]" : ""}`}
+            className={`flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-[11px] cursor-pointer rounded-md px-1 sm:px-1.5 py-0.5 transition-all ${hover === i ? "bg-[var(--warm-glow)]" : ""}`}
             onMouseEnter={() => setHover(i)}
             onMouseLeave={() => setHover(null)}
           >
-            <div className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: seg.color }} />
-            <span className="text-[var(--fg-muted)]">{seg.label}</span>
+            <div className="h-2 w-2 sm:h-2.5 sm:w-2.5 rounded-full shrink-0" style={{ backgroundColor: seg.color }} />
+            <span className="text-[var(--fg-muted)] max-w-[60px] sm:max-w-none truncate">{seg.label}</span>
             <span className="font-semibold text-[var(--fg)]">{Math.round(seg.value / total * 100)}%</span>
           </div>
         ))}
@@ -176,7 +180,7 @@ export default function CostsPage() {
           ]} />
         </Card>
 
-        <div className="grid gap-3 grid-cols-2 md:grid-cols-3 content-start">
+        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 content-start">
           <StatCard label={t("dash.budget")} value={fmt(fin.totalBudget)} icon={<Wallet size={18} />}>
             <div className="space-y-1 text-xs">
               <div className="flex justify-between"><span className="text-[var(--fg-muted)]">{t("costs.totalCost")}</span><span className="font-semibold">{fmt(fin.totalCost)}</span></div>

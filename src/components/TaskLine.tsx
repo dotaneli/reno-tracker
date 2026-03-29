@@ -62,8 +62,8 @@ export function TaskLine({ node, milestones, tr, compact = false, onMutate }: Ta
           {cost > 0 && (
             <ChevronRight size={12} className={`shrink-0 text-[var(--fg-muted)] transition-transform ${expanded ? "rotate-90" : ""}`} />
           )}
-          <span className={`font-semibold ${isDone ? "text-[var(--fg-muted)] line-through" : "text-[var(--fg)]"} ${compact ? "text-xs" : "text-sm"}`}>{tr(node.name)}</span>
-          {node.vendor?.name && <span className="text-xs text-[var(--fg-muted)]">{tr(node.vendor.name)}</span>}
+          <span className={`font-semibold truncate max-w-[120px] sm:max-w-none ${isDone ? "text-[var(--fg-muted)] line-through" : "text-[var(--fg)]"} ${compact ? "text-xs" : "text-sm"}`}>{tr(node.name)}</span>
+          {node.vendor?.name && <span className="hidden sm:inline text-xs text-[var(--fg-muted)]">{tr(node.vendor.name)}</span>}
           {(node.category?.name || node.nodeType) && (
             <span className="rounded bg-[var(--accent-soft)] px-1.5 py-px text-[8px] font-bold uppercase text-[var(--accent)]">
               {node.category?.name ? tr(node.category.name) : node.nodeType}
@@ -118,10 +118,10 @@ export function MilestoneLine({ m, tr }: { m: any; tr: (text: string) => string 
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-1 text-xs rounded-lg px-2 -mx-2 transition-colors hover:bg-[var(--warm-glow)]">
-      <div className="flex items-center gap-1.5">
-        <span className="font-medium text-[var(--fg)]">{m.label}</span>
-        <span className="text-[var(--fg-muted)]">{m.nodeName || m.node?.name || ""}</span>
-        {m.dueDate && <span className="text-[var(--fg-muted)]">{new Date(m.dueDate).toLocaleDateString(lang === "he" ? "he-IL" : "en-IL", { day: "numeric", month: "short" })}</span>}
+      <div className="flex items-center gap-1.5 min-w-0">
+        <span className="font-medium text-[var(--fg)] truncate max-w-[80px] sm:max-w-none">{m.label}</span>
+        <span className="hidden sm:inline text-[var(--fg-muted)]">{m.nodeName || m.node?.name || ""}</span>
+        {m.dueDate && <span className="text-[var(--fg-muted)] shrink-0">{new Date(m.dueDate).toLocaleDateString(lang === "he" ? "he-IL" : "en-IL", { day: "numeric", month: "short" })}</span>}
       </div>
       <div className="flex items-center gap-1.5">
         <span className="font-semibold">{fmt(Number(m.amount))}</span>

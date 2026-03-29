@@ -172,8 +172,8 @@ export default function TasksPage() {
 
       {/* Budget Bar */}
       {!fin.loading && (
-        <div className="flex flex-wrap items-center gap-4 rounded-2xl bg-[var(--fg)] px-4 py-3 md:px-6 md:py-4 text-[var(--bg-elevated)]">
-          <div className="flex items-center gap-2">
+        <div className="grid grid-cols-2 gap-x-3 gap-y-2 rounded-2xl bg-[var(--fg)] px-4 py-3 md:px-6 md:py-4 text-[var(--bg-elevated)] sm:flex sm:flex-wrap sm:items-center sm:gap-4">
+          <div className="flex items-center gap-2 col-span-2 sm:col-span-1">
             <Wallet size={16} className="text-[var(--accent)]" />
             <span className="text-xs font-medium opacity-70">{t("dash.budget")}</span>
             <span className="text-sm font-bold">{fmt(fin.totalBudget)}</span>
@@ -202,7 +202,7 @@ export default function TasksPage() {
               </div>
             </>
           )}
-          <div className="ms-auto flex items-center gap-1.5 text-xs">
+          <div className="col-span-2 sm:col-span-1 sm:ms-auto flex items-center gap-1.5 text-xs">
             <span className="opacity-70">{t("task.budgetRemaining")}</span>
             <span className={`font-bold ${fin.budgetRemaining >= 0 ? "text-[#78B080]" : "text-red-400"}`}>{fmt(fin.budgetRemaining)}</span>
           </div>

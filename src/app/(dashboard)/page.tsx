@@ -48,7 +48,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Financial stats — ALL expandable */}
-      <div className="grid gap-3 grid-cols-2 md:grid-cols-5">
+      <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-5">
         <StatCard label={t("dash.budget")} value={fmt(fin.totalBudget)} icon={<Wallet size={18} />}>
           <div className="space-y-1 text-xs">
             <div className="flex justify-between"><span className="text-[var(--fg-muted)]">{t("costs.totalCost")}</span><span className="font-semibold">{fmt(fin.totalCost)}</span></div>
