@@ -23,18 +23,19 @@ export async function GET(request: Request) {
           rooms: { include: { room: true } },
           vendor: true,
           category: true,
-          milestones: { select: { amount: true, status: true } },
+          milestones: true,
           _count: { select: { children: true, milestones: true, receipts: true, notes: true, issues: true } },
         },
         orderBy: { sortOrder: "asc" },
       });
 
-      // Build tree with payment summaries
+      // Build tree with payment summaries — keep milestones for inline panels
       const nodeMap = new Map<string, any>();
       for (const n of allNodes) {
         const paid = n.milestones.filter((m: any) => m.status === "PAID").reduce((s: number, m: any) => s + Number(m.amount), 0);
         const totalMs = n.milestones.reduce((s: number, m: any) => s + Number(m.amount), 0);
-        nodeMap.set(n.id, { ...n, milestones: undefined, _paid: paid, _totalMilestoned: totalMs, children: [] });
+        const ms = n.milestones.map((m: any) => ({ ...m, amount: m.amount, nodeId: n.id, nodeName: n.name }));
+        nodeMap.set(n.id, { ...n, milestones: ms, _paid: paid, _totalMilestoned: totalMs, children: [] });
       }
       const roots: any[] = [];
       for (const n of allNodes) {
