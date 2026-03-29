@@ -18,6 +18,7 @@ export default function CategoriesPage() {
   const { activeProject: project } = useProject();
   const { data: categories } = useApi<any[]>(project ? `/api/categories?projectId=${project.id}` : null);
   const { data: allNodes } = useApi<any[]>(project ? `/api/nodes?projectId=${project.id}` : null);
+  const { data: projectMs } = useApi<any[]>(project ? `/api/projects/${project.id}/milestones` : null);
   const [showAdd, setShowAdd] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [addName, setAddName] = useState("");
@@ -144,7 +145,7 @@ export default function CategoriesPage() {
                   </div>
                 }>
                   {cat.nodes.length > 0 ? (
-                    <div className="space-y-0.5 rounded-lg bg-[var(--bg)] p-2">{cat.nodes.map((n: any) => <TaskLine key={n.id} node={n} tr={tr} compact onMutate={mutateAll} />)}</div>
+                    <div className="space-y-0.5 rounded-lg bg-[var(--bg)] p-2">{cat.nodes.map((n: any) => <TaskLine key={n.id} node={n} tr={tr} compact onMutate={mutateAll} allProjectMilestones={projectMs || []} />)}</div>
                   ) : <p className="text-xs text-[var(--fg-muted)] py-2">—</p>}
                 </Expandable>
               )}

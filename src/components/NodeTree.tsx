@@ -32,9 +32,10 @@ interface NodeTreeProps {
   tr: (text: string) => string;
   parentVendor?: string | null;
   parentCost?: number | null;
+  allProjectMilestones?: any[];
 }
 
-export function NodeTree({ nodes, depth = 0, projectId, vendors, categories, floors, allNodes, editNodeId, onMutate, onEdit, onEditDone, onEditCancel, tr, parentVendor, parentCost }: NodeTreeProps) {
+export function NodeTree({ nodes, depth = 0, projectId, vendors, categories, floors, allNodes, editNodeId, onMutate, onEdit, onEditDone, onEditCancel, tr, parentVendor, parentCost, allProjectMilestones }: NodeTreeProps) {
   const { t, lang } = useI18n();
   const [activeId, setActiveId] = useState<string | null>(null);
 
@@ -71,7 +72,7 @@ export function NodeTree({ nodes, depth = 0, projectId, vendors, categories, flo
         <RootDropZone active={!!activeId} label={t("task.moveToRoot")} />
         <div className="space-y-2">
           {nodes.map((node) => (
-            <DraggableNode key={node.id} node={node} depth={0} projectId={projectId} vendors={vendors} categories={categories} floors={floors} allNodes={allNodes} editNodeId={editNodeId} onMutate={onMutate} onEdit={onEdit} onEditDone={onEditDone} onEditCancel={onEditCancel} tr={tr} fmt={fmt} parentVendor={parentVendor} parentCost={parentCost} />
+            <DraggableNode key={node.id} node={node} depth={0} projectId={projectId} vendors={vendors} categories={categories} floors={floors} allNodes={allNodes} editNodeId={editNodeId} onMutate={onMutate} onEdit={onEdit} onEditDone={onEditDone} onEditCancel={onEditCancel} tr={tr} fmt={fmt} parentVendor={parentVendor} parentCost={parentCost} allProjectMilestones={allProjectMilestones} />
           ))}
         </div>
         <DragOverlay>
@@ -88,7 +89,7 @@ export function NodeTree({ nodes, depth = 0, projectId, vendors, categories, flo
   return (
     <div className="ms-3 md:ms-5 border-s border-[var(--border-subtle)] ps-2 md:ps-3 mt-1 space-y-2">
       {nodes.map((node) => (
-        <DraggableNode key={node.id} node={node} depth={depth} projectId={projectId} vendors={vendors} categories={categories} floors={floors} allNodes={allNodes} editNodeId={editNodeId} onMutate={onMutate} onEdit={onEdit} onEditDone={onEditDone} onEditCancel={onEditCancel} tr={tr} fmt={fmt} parentVendor={parentVendor} parentCost={parentCost} />
+        <DraggableNode key={node.id} node={node} depth={depth} projectId={projectId} vendors={vendors} categories={categories} floors={floors} allNodes={allNodes} editNodeId={editNodeId} onMutate={onMutate} onEdit={onEdit} onEditDone={onEditDone} onEditCancel={onEditCancel} tr={tr} fmt={fmt} parentVendor={parentVendor} parentCost={parentCost} allProjectMilestones={allProjectMilestones} />
       ))}
     </div>
   );
@@ -114,7 +115,7 @@ function DraggableNode(props: Omit<NodeTreeProps, "nodes"> & { node: any; fmt: (
   );
 }
 
-function NodeRow({ node, depth = 0, projectId, vendors, categories, floors, allNodes, editNodeId, onMutate, onEdit, onEditDone, onEditCancel, tr, fmt, parentVendor, parentCost, dragListeners, isOver }: Omit<NodeTreeProps, "nodes"> & { node: any; fmt: (n: number | null) => string; dragListeners?: any; isOver?: boolean }) {
+function NodeRow({ node, depth = 0, projectId, vendors, categories, floors, allNodes, editNodeId, onMutate, onEdit, onEditDone, onEditCancel, tr, fmt, parentVendor, parentCost, allProjectMilestones, dragListeners, isOver }: Omit<NodeTreeProps, "nodes"> & { node: any; fmt: (n: number | null) => string; dragListeners?: any; isOver?: boolean }) {
   const { t, lang } = useI18n();
   const [expanded, setExpanded] = useState(true);
   const [showMilestones, setShowMilestones] = useState(false);
@@ -248,7 +249,7 @@ function NodeRow({ node, depth = 0, projectId, vendors, categories, floors, allN
       {/* Milestones */}
       {showMilestones && hasCost && (
         <div className="ms-3 md:ms-7 mt-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-3">
-          <ItemMilestones itemId={node.id} expectedCost={ownCost} onMutate={onMutate} />
+          <ItemMilestones itemId={node.id} expectedCost={ownCost} onMutate={onMutate} prefetchedMilestones={allProjectMilestones?.filter((m: any) => m.nodeId === node.id)} />
         </div>
       )}
 

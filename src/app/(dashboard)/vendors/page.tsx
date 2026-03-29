@@ -24,6 +24,7 @@ export default function VendorsPage() {
   const { activeProject: project } = useProject();
   const { data: vendors } = useApi<any[]>(project ? `/api/vendors?projectId=${project.id}` : null);
   const { data: allNodes } = useApi<any[]>(project ? `/api/nodes?projectId=${project.id}` : null);
+  const { data: projectMs } = useApi<any[]>(project ? `/api/projects/${project.id}/milestones` : null);
 
   const allTexts = useMemo(() => [...(vendors?.map((v: any) => v.name) || []), ...(allNodes?.map((n: any) => n.name) || [])], [vendors, allNodes]);
   const tr = useTranslate(allTexts);
@@ -170,7 +171,7 @@ export default function VendorsPage() {
                   </div>
                 }>
                   {v.nodes.length > 0 ? (
-                    <div className="space-y-0.5 rounded-lg bg-[var(--bg)] p-2">{v.nodes.map((n: any) => <TaskLine key={n.id} node={n} tr={tr} compact onMutate={mutateAll} />)}</div>
+                    <div className="space-y-0.5 rounded-lg bg-[var(--bg)] p-2">{v.nodes.map((n: any) => <TaskLine key={n.id} node={n} tr={tr} compact onMutate={mutateAll} allProjectMilestones={projectMs || []} />)}</div>
                   ) : <p className="text-xs text-[var(--fg-muted)] py-2">—</p>}
                 </Expandable>
               )}

@@ -308,7 +308,7 @@ export default function TasksPage() {
         <Card><p className="py-12 text-center text-sm text-[var(--fg-muted)]">{t("task.noTasks")}</p></Card>
       ) : viewMode === "list" ? (
         /* ── List View (Tree) ── */
-        <NodeTree nodes={filteredTree || tree} projectId={project.id} vendors={vendors || []} categories={categories || []} floors={floors || []} allNodes={allNodesFlat || []} editNodeId={editNodeId} onMutate={mutateAll} onEdit={startEdit} onEditDone={() => { resetEdit(); mutateAll(); }} onEditCancel={resetEdit} tr={tr} />
+        <NodeTree nodes={filteredTree || tree} projectId={project.id} vendors={vendors || []} categories={categories || []} floors={floors || []} allNodes={allNodesFlat || []} editNodeId={editNodeId} onMutate={mutateAll} onEdit={startEdit} onEditDone={() => { resetEdit(); mutateAll(); }} onEditCancel={resetEdit} tr={tr} allProjectMilestones={fin.milestones} />
       ) : (
         /* ── Card Gallery View ── */
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -318,7 +318,7 @@ export default function TasksPage() {
             </div>
           ) : filteredNodes.map((node: any) => {
             const parentNode = node.parentId ? allNodesFlat?.find((n: any) => n.id === node.parentId) : null;
-            return <TaskCard key={node.id} node={node} parentName={parentNode ? tr(parentNode.name) : null} tr={tr} fmt={fmt} t={t} isEditing={editNodeId === node.id} onEdit={() => startEdit(node)} onEditDone={() => { resetEdit(); mutateAll(); }} onEditCancel={resetEdit} onMutate={mutateAll} projectId={project.id} allNodes={allNodesFlat || []} vendors={vendors || []} categories={categories || []} floors={floors || []} />;
+            return <TaskCard key={node.id} node={node} parentName={parentNode ? tr(parentNode.name) : null} tr={tr} fmt={fmt} t={t} isEditing={editNodeId === node.id} onEdit={() => startEdit(node)} onEditDone={() => { resetEdit(); mutateAll(); }} onEditCancel={resetEdit} onMutate={mutateAll} projectId={project.id} allNodes={allNodesFlat || []} vendors={vendors || []} categories={categories || []} floors={floors || []} allProjectMilestones={fin.milestones} />;
           })}
         </div>
       )}
@@ -328,10 +328,10 @@ export default function TasksPage() {
 
 // ── Task Card Component (full functionality) ──
 
-function TaskCard({ node, parentName, tr, fmt, t, isEditing, onEdit, onEditDone, onEditCancel, onMutate, projectId, allNodes, vendors, categories, floors }: {
+function TaskCard({ node, parentName, tr, fmt, t, isEditing, onEdit, onEditDone, onEditCancel, onMutate, projectId, allNodes, vendors, categories, floors, allProjectMilestones }: {
   node: any; parentName: string | null; tr: (s: string) => string; fmt: (n: number) => string;
   t: (key: TKey) => string; isEditing: boolean; onEdit: () => void; onEditDone: () => void; onEditCancel: () => void;
-  onMutate: () => void; projectId: string; allNodes: any[]; vendors: any[]; categories: any[]; floors: any[];
+  onMutate: () => void; projectId: string; allNodes: any[]; vendors: any[]; categories: any[]; floors: any[]; allProjectMilestones: any[];
 }) {
   const { lang } = useI18n();
   const [expanded, setExpanded] = useState(false);
@@ -481,7 +481,7 @@ function TaskCard({ node, parentName, tr, fmt, t, isEditing, onEdit, onEditDone,
 
           {/* Payment milestones */}
           {cost > 0 && !isEditing && (
-            <ItemMilestones itemId={node.id} expectedCost={cost} onMutate={onMutate} />
+            <ItemMilestones itemId={node.id} expectedCost={cost} onMutate={onMutate} prefetchedMilestones={allProjectMilestones?.filter((m: any) => m.nodeId === node.id)} />
           )}
 
           {/* Children preview */}

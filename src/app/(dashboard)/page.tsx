@@ -117,12 +117,12 @@ export default function DashboardPage() {
       <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
         <StatCard label={t("dash.groups")} value={rootNodes.length} icon={<Layers size={18} />}>
           <div className="max-h-48 overflow-y-auto space-y-0.5">
-            {rootNodes.map((n: any) => <TaskLine key={n.id} node={n} tr={tr} compact onMutate={mutateAll} />)}
+            {rootNodes.map((n: any) => <TaskLine key={n.id} node={n} tr={tr} compact onMutate={mutateAll} allProjectMilestones={fin.milestones} />)}
           </div>
         </StatCard>
         <StatCard label={t("dash.tasks")} value={leafNodes.length} icon={<Package size={18} />}>
           <div className="max-h-48 overflow-y-auto space-y-0.5">
-            {leafNodes.slice(0, 15).map((n: any) => <TaskLine key={n.id} node={n} tr={tr} compact onMutate={mutateAll} />)}
+            {leafNodes.slice(0, 15).map((n: any) => <TaskLine key={n.id} node={n} tr={tr} compact onMutate={mutateAll} allProjectMilestones={fin.milestones} />)}
             {leafNodes.length > 15 && <Link href="/tasks" className="text-xs text-[var(--accent)] font-medium hover:underline pt-1">{leafNodes.length - 15} {t("general.more")}</Link>}
           </div>
         </StatCard>
@@ -151,7 +151,7 @@ export default function DashboardPage() {
               }>
                 <div className="rounded-lg bg-[var(--bg)] p-3 text-xs space-y-2">
                   {issue.description && <p className="text-[var(--fg-muted)]">{tr(issue.description)}</p>}
-                  {issue.node && <TaskLine node={issue.node} tr={tr} compact onMutate={mutateAll} />}
+                  {issue.node && <TaskLine node={issue.node} tr={tr} compact onMutate={mutateAll} allProjectMilestones={fin.milestones} />}
                   <button onClick={() => router.push("/issues")} className="flex items-center gap-1 text-[var(--accent)] font-medium hover:underline">
                     <ArrowUpRight size={12} />{t("nav.issues")}
                   </button>

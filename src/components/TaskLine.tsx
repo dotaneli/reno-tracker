@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import { StatusBadge } from "./StatusBadge";
 import { ItemMilestones } from "./ItemMilestones";
 import { CheckCircle2, CircleDollarSign, ChevronRight } from "lucide-react";
-import { preload } from "swr";
 
 interface TaskLineProps {
   node: any;
@@ -13,9 +12,10 @@ interface TaskLineProps {
   tr: (text: string) => string;
   compact?: boolean;
   onMutate?: () => void;
+  allProjectMilestones?: any[];
 }
 
-export function TaskLine({ node, milestones, tr, compact = false, onMutate }: TaskLineProps) {
+export function TaskLine({ node, milestones, tr, compact = false, onMutate, allProjectMilestones }: TaskLineProps) {
   const { t, lang } = useI18n();
   const [expanded, setExpanded] = useState(false);
 
@@ -29,14 +29,6 @@ export function TaskLine({ node, milestones, tr, compact = false, onMutate }: Ta
   const pct = cost > 0 ? Math.round((paid / cost) * 100) : 0;
   const isDone = node.status === "COMPLETED";
   const isFullyPaid = cost > 0 && paid >= cost;
-
-  // Prefetch milestones on hover so they're cached when expanded
-  const prefetchMilestones = useCallback(() => {
-    if (cost > 0 && !expanded) {
-      const fetcher = (url: string) => fetch(url).then(r => r.json());
-      preload(`/api/nodes/${node.id}/milestones`, fetcher);
-    }
-  }, [cost, expanded, node.id]);
 
   const handleMarkDone = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -55,7 +47,6 @@ export function TaskLine({ node, milestones, tr, compact = false, onMutate }: Ta
       {/* Clickable row */}
       <div
         onClick={() => cost > 0 && setExpanded(!expanded)}
-        onPointerEnter={prefetchMilestones}
         className={`flex flex-wrap items-center justify-between gap-x-2 gap-y-1 rounded-lg px-2 transition-colors ${cost > 0 ? "cursor-pointer" : ""} ${expanded ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--warm-glow)]"} ${compact ? "py-1.5" : "py-2"}`}
       >
         <div className="flex flex-wrap items-center gap-1.5 min-w-0">
@@ -104,7 +95,7 @@ export function TaskLine({ node, milestones, tr, compact = false, onMutate }: Ta
       {/* Expanded: inline payments panel */}
       {expanded && cost > 0 && (
         <div className="ms-4 mb-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-2">
-          <ItemMilestones itemId={node.id} expectedCost={cost} onMutate={onMutate} />
+          <ItemMilestones itemId={node.id} expectedCost={cost} onMutate={onMutate} prefetchedMilestones={allProjectMilestones?.filter((m: any) => m.nodeId === node.id)} />
         </div>
       )}
     </div>

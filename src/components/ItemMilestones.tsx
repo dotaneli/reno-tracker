@@ -13,9 +13,10 @@ interface Props {
   itemId: string;
   expectedCost: number | null;
   onMutate?: () => void;
+  prefetchedMilestones?: any[];
 }
 
-export function ItemMilestones({ itemId, expectedCost, onMutate: onParentMutate }: Props) {
+export function ItemMilestones({ itemId, expectedCost, onMutate: onParentMutate, prefetchedMilestones }: Props) {
   const { t, lang } = useI18n();
   const [showAddForm, setShowAddForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -25,7 +26,9 @@ export function ItemMilestones({ itemId, expectedCost, onMutate: onParentMutate 
   const [file, setFile] = useState<File | null>(null);
   const [editFile, setEditFile] = useState<File | null>(null);
 
-  const { data: milestones } = useApi<any[]>(`/api/nodes/${itemId}/milestones`, { keepPreviousData: true });
+  // Use prefetched data if available, otherwise fetch per-item (fallback)
+  const { data: fetchedMilestones } = useApi<any[]>(prefetchedMilestones ? null : `/api/nodes/${itemId}/milestones`, { keepPreviousData: true });
+  const milestones = prefetchedMilestones || fetchedMilestones;
   const mutateMilestones = () => { mutate(`/api/nodes/${itemId}/milestones`); onParentMutate?.(); };
 
   const fmt = (n: number) =>

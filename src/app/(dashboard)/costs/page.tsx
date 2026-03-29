@@ -205,7 +205,7 @@ export default function CostsPage() {
 
           <StatCard label={t("costs.totalCost")} value={fmt(fin.totalCost)} icon={<TrendingUp size={18} />}>
             <div className="max-h-32 overflow-y-auto space-y-0.5">
-              {costNodes.map((n: any) => <TaskLine key={n.id} node={n} tr={tr} compact onMutate={mutateAll} />)}
+              {costNodes.map((n: any) => <TaskLine key={n.id} node={n} tr={tr} compact onMutate={mutateAll} allProjectMilestones={ms} />)}
             </div>
           </StatCard>
 
@@ -273,7 +273,7 @@ export default function CostsPage() {
                 return (
                   <Card key={g.nodeId} className="!p-2">
                     {node ? (
-                      <TaskLine node={node} tr={tr} compact onMutate={mutateAll} />
+                      <TaskLine node={node} tr={tr} compact onMutate={mutateAll} allProjectMilestones={ms} />
                     ) : (
                       <div className="px-2 py-1.5 text-xs font-semibold text-[var(--fg)]">{tr(g.name)}</div>
                     )}
@@ -290,7 +290,7 @@ export default function CostsPage() {
               </div>
               {unpaidData.gapGroups.map((g) => (
                 <Card key={g.nodeId} className="!p-2">
-                  {g.node ? <TaskLine node={g.node} tr={tr} compact onMutate={mutateAll} /> : (
+                  {g.node ? <TaskLine node={g.node} tr={tr} compact onMutate={mutateAll} allProjectMilestones={ms} /> : (
                     <div className="flex items-center justify-between gap-2 px-2 py-1.5">
                       <p className="text-xs font-semibold text-[var(--fg)]">{tr(g.name)}</p>
                       <p className="text-xs font-bold text-amber-600">{fmt(g.gap)}</p>
@@ -308,7 +308,7 @@ export default function CostsPage() {
               </div>
               {unpaidData.noPaymentTasks.map((n: any) => (
                 <Card key={n.id} className="!p-2">
-                  <TaskLine node={n} tr={tr} compact onMutate={mutateAll} />
+                  <TaskLine node={n} tr={tr} compact onMutate={mutateAll} allProjectMilestones={ms} />
                 </Card>
               ))}
             </div>}
@@ -335,7 +335,7 @@ export default function CostsPage() {
                   </div>
                 }>
                   <div className="rounded-lg bg-[var(--bg)] p-2">
-                    {allNodes?.find((n: any) => n.id === m.nodeId) && <TaskLine node={allNodes.find((n: any) => n.id === m.nodeId)} tr={tr} compact onMutate={mutateAll} />}
+                    {allNodes?.find((n: any) => n.id === m.nodeId) && <TaskLine node={allNodes.find((n: any) => n.id === m.nodeId)} tr={tr} compact onMutate={mutateAll} allProjectMilestones={ms} />}
                   </div>
                 </Expandable>
               </Card>
@@ -358,7 +358,7 @@ export default function CostsPage() {
                   </div>
                 }>
                   <div className="rounded-lg bg-[var(--bg)] p-2">
-                    {allNodes?.find((n: any) => n.id === m.nodeId) && <TaskLine node={allNodes.find((n: any) => n.id === m.nodeId)} tr={tr} compact onMutate={mutateAll} />}
+                    {allNodes?.find((n: any) => n.id === m.nodeId) && <TaskLine node={allNodes.find((n: any) => n.id === m.nodeId)} tr={tr} compact onMutate={mutateAll} allProjectMilestones={ms} />}
                   </div>
                 </Expandable>
               </Card>

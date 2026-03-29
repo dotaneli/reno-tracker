@@ -26,6 +26,7 @@ export default function PropertyPage() {
   const { activeProject: project } = useProject();
   const { data: floors } = useApi<any[]>(project ? `/api/floors?projectId=${project.id}` : null);
   const { data: allNodes } = useApi<any[]>(project ? `/api/nodes?projectId=${project.id}` : null);
+  const { data: projectMs } = useApi<any[]>(project ? `/api/projects/${project.id}/milestones` : null);
 
   const allTexts = useMemo(() => [
     ...(floors?.map((f: any) => f.name) || []),
@@ -238,7 +239,7 @@ export default function PropertyPage() {
                           }>
                             {roomTasks.length > 0 ? (
                               <div className="rounded-lg bg-[var(--bg)] p-2 space-y-0.5">
-                                {roomTasks.map((n: any) => <TaskLine key={n.id} node={n} tr={tr} compact onMutate={mutateAll} />)}
+                                {roomTasks.map((n: any) => <TaskLine key={n.id} node={n} tr={tr} compact onMutate={mutateAll} allProjectMilestones={projectMs || []} />)}
                               </div>
                             ) : <p className="text-xs text-[var(--fg-muted)] py-1">—</p>}
                           </Expandable>
