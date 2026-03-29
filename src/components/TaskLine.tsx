@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useI18n } from "@/lib/i18n";
 import { StatusBadge } from "./StatusBadge";
 import { ItemMilestones } from "./ItemMilestones";
 import { CheckCircle2, CircleDollarSign, ChevronRight } from "lucide-react";
+import { preload } from "swr";
 
 interface TaskLineProps {
   node: any;
@@ -29,6 +30,14 @@ export function TaskLine({ node, milestones, tr, compact = false, onMutate }: Ta
   const isDone = node.status === "COMPLETED";
   const isFullyPaid = cost > 0 && paid >= cost;
 
+  // Prefetch milestones on hover so they're cached when expanded
+  const prefetchMilestones = useCallback(() => {
+    if (cost > 0 && !expanded) {
+      const fetcher = (url: string) => fetch(url).then(r => r.json());
+      preload(`/api/nodes/${node.id}/milestones`, fetcher);
+    }
+  }, [cost, expanded, node.id]);
+
   const handleMarkDone = async (e: React.MouseEvent) => {
     e.stopPropagation();
     await fetch(`/api/nodes/${node.id}/done`, { method: "POST" });
@@ -46,6 +55,7 @@ export function TaskLine({ node, milestones, tr, compact = false, onMutate }: Ta
       {/* Clickable row */}
       <div
         onClick={() => cost > 0 && setExpanded(!expanded)}
+        onPointerEnter={prefetchMilestones}
         className={`flex flex-wrap items-center justify-between gap-x-2 gap-y-1 rounded-lg px-2 transition-colors ${cost > 0 ? "cursor-pointer" : ""} ${expanded ? "bg-[var(--accent-soft)]" : "hover:bg-[var(--warm-glow)]"} ${compact ? "py-1.5" : "py-2"}`}
       >
         <div className="flex flex-wrap items-center gap-1.5 min-w-0">
@@ -77,12 +87,12 @@ export function TaskLine({ node, milestones, tr, compact = false, onMutate }: Ta
           {onMutate && (
             <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
               {!isDone && (
-                <button onClick={handleMarkDone} className="rounded-md p-1 text-[var(--fg-muted)]/30 transition-all hover:bg-[var(--success-soft)] hover:text-[var(--success)]" title={t("task.markDone")}>
+                <button onClick={handleMarkDone} className="rounded-md p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-[var(--fg-muted)]/30 transition-all hover:bg-[var(--success-soft)] hover:text-[var(--success)]" title={t("task.markDone")}>
                   <CheckCircle2 size={13} />
                 </button>
               )}
               {cost > 0 && !isFullyPaid && (
-                <button onClick={handleMarkPaid} className="rounded-md p-1 text-[var(--fg-muted)]/30 transition-all hover:bg-amber-50 hover:text-amber-600" title={t("task.markPaid")}>
+                <button onClick={handleMarkPaid} className="rounded-md p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-[var(--fg-muted)]/30 transition-all hover:bg-amber-50 hover:text-amber-600" title={t("task.markPaid")}>
                   <CircleDollarSign size={13} />
                 </button>
               )}

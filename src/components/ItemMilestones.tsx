@@ -25,7 +25,7 @@ export function ItemMilestones({ itemId, expectedCost, onMutate: onParentMutate 
   const [file, setFile] = useState<File | null>(null);
   const [editFile, setEditFile] = useState<File | null>(null);
 
-  const { data: milestones } = useApi<any[]>(`/api/nodes/${itemId}/milestones`);
+  const { data: milestones } = useApi<any[]>(`/api/nodes/${itemId}/milestones`, { keepPreviousData: true });
   const mutateMilestones = () => { mutate(`/api/nodes/${itemId}/milestones`); onParentMutate?.(); };
 
   const fmt = (n: number) =>
@@ -104,7 +104,7 @@ export function ItemMilestones({ itemId, expectedCost, onMutate: onParentMutate 
                 <X size={12} className="text-[var(--fg-muted)]" />
               </button>
               <input type="text" placeholder={t("item.milestoneLabel")} value={editForm.label} onChange={(e) => setEditForm({ ...editForm, label: e.target.value })} required className={input} autoFocus />
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <input type="number" placeholder={t("item.amount")} value={editForm.amount} onChange={(e) => setEditForm({ ...editForm, amount: e.target.value })} required className={input} />
                 <input type="date" value={editForm.dueDate} onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })} className={input} />
                 <select value={editForm.status} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })} className={`${input} appearance-none`}>
