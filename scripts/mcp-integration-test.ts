@@ -475,6 +475,79 @@ async function testRateLimitHeaders() {
   assert(ok === 5, `5 rapid calls all succeed (${ok}/5)`);
 }
 
+async function testCrossProjectValidation() {
+  console.log("\n🔐 Cross-project vendor/category validation");
+
+  // Create a second project
+  const proj2 = await prisma.project.create({ data: { name: "MCP Test Project 2", totalBudget: 1000 } });
+  await prisma.projectMember.create({ data: { projectId: proj2.id, userId: USER_ID, role: "OWNER" } });
+
+  // Create a vendor in project 2
+  const otherVendor = await prisma.vendor.create({ data: { name: "Other Vendor", projectId: proj2.id } });
+  const otherCategory = await prisma.category.create({ data: { name: "Other Cat", projectId: proj2.id } });
+
+  // Try to create a node in project 1 with project 2's vendor — should fail
+  const crossVendor = await mcpTool("create_node", { projectId: PROJECT_ID, name: "Cross vendor test", vendorId: otherVendor.id });
+  assert(!!crossVendor._error, "cross-project vendor rejected");
+
+  const crossCat = await mcpTool("create_node", { projectId: PROJECT_ID, name: "Cross cat test", categoryId: otherCategory.id });
+  assert(!!crossCat._error, "cross-project category rejected");
+
+  // Clean up project 2
+  await prisma.vendor.deleteMany({ where: { projectId: proj2.id } });
+  await prisma.category.deleteMany({ where: { projectId: proj2.id } });
+  await prisma.projectMember.deleteMany({ where: { projectId: proj2.id } });
+  await prisma.project.delete({ where: { id: proj2.id } });
+}
+
+async function testMilestoneNodeVerification() {
+  console.log("\n🔐 Milestone-node ownership verification");
+
+  // Create a second node
+  const otherNode = await mcpTool("create_node", { projectId: PROJECT_ID, name: "Other node for ms test", expectedCost: 1000 });
+  const otherMs = await mcpTool("create_milestone", { nodeId: otherNode.id, label: "Test ms", amount: 500 });
+
+  // Try to update the milestone claiming it belongs to CHILD_NODE_ID
+  const crossUpdate = await mcpTool("update_milestone", { nodeId: CHILD_NODE_ID, milestoneId: otherMs.id, label: "Hacked" });
+  assert(!!crossUpdate._error, "milestone cross-node update rejected");
+  assert(crossUpdate._error?.code === -32004, `returns 404 not-found (got ${crossUpdate._error?.code})`);
+
+  // Clean up
+  await prisma.paymentMilestone.deleteMany({ where: { nodeId: otherNode.id } });
+  await prisma.projectNode.delete({ where: { id: otherNode.id } });
+}
+
+async function testDoubleCountingGuards() {
+  console.log("\n🛡️ Double-counting guards");
+
+  // CHILD_NODE_ID has expectedCost=30000. Try to set cost on its parent (NODE_ID group)
+  const parentCost = await mcpTool("update_node", { nodeId: NODE_ID, expectedCost: 50000 });
+  assert(!!parentCost._error, "guard: cannot set cost on parent with costed children");
+
+  // Create a standalone node with cost, then try adding a child with cost
+  const standalone = await mcpTool("create_node", { projectId: PROJECT_ID, name: "Standalone guard test", expectedCost: 5000 });
+  assert(!standalone._error, "standalone with cost created");
+  const childOfStandalone = await mcpTool("create_node", { projectId: PROJECT_ID, name: "Child of standalone", parentId: standalone.id, expectedCost: 1000 });
+  assert(!!childOfStandalone._error, "guard: cannot add costed child to costed parent");
+
+  // Clean up
+  await prisma.projectNode.delete({ where: { id: standalone.id } });
+}
+
+async function testDemoSeedIdempotent() {
+  console.log("\n🏠 Demo seed idempotency");
+
+  // The seed function should be importable and safe to call
+  // We can't actually call it in tests (it creates real data), but we verify the Dream House exists
+  const dreamHouse = await prisma.project.findFirst({
+    where: { name: "Dream House Renovation" },
+    include: { _count: { select: { nodes: true, members: true } } },
+  });
+  assert(!!dreamHouse, "Dream House Renovation project exists");
+  assert(dreamHouse!._count.nodes >= 50, `has 50+ nodes (got ${dreamHouse?._count.nodes})`);
+  assert(dreamHouse!._count.members >= 1, "has at least 1 member");
+}
+
 // ── Teardown ──
 
 async function teardown() {
@@ -562,6 +635,14 @@ async function main() {
 
     // Rate limit
     await testRateLimitHeaders();
+
+    // Security: cross-project validation
+    await testCrossProjectValidation();
+    await testMilestoneNodeVerification();
+    await testDoubleCountingGuards();
+
+    // Demo project verification
+    await testDemoSeedIdempotent();
 
   } finally {
     await teardown();

@@ -369,6 +369,14 @@ export async function executeTool(toolName: string, args: Record<string, any>, a
         if (!parent || parent.projectId !== projectId) throw new AuthError("Invalid parentId", 400);
         if (expectedCost && parent.expectedCost) throw new AuthError("Cannot set cost on a sub-task when the parent already has a cost (would double-count)", 400);
       }
+      if (vendorId) {
+        const vendor = await prisma.vendor.findUnique({ where: { id: vendorId }, select: { projectId: true } });
+        if (!vendor || vendor.projectId !== projectId) throw new AuthError("Invalid vendorId", 400);
+      }
+      if (categoryId) {
+        const cat = await prisma.category.findUnique({ where: { id: categoryId }, select: { projectId: true } });
+        if (!cat || cat.projectId !== projectId) throw new AuthError("Invalid categoryId", 400);
+      }
       const node = await prisma.projectNode.create({
         data: { name: name.trim(), projectId, parentId: parentId || null, expectedCost, vendorId: vendorId || null, categoryId: categoryId || null, status: status as any || undefined },
         include: { vendor: true, category: true },
