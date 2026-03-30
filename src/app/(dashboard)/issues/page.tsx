@@ -20,7 +20,7 @@ export default function IssuesPage() {
   const [error, setError] = useState("");
 
   const { activeProject: project } = useProject();
-  const { data: issues } = useApi<any[]>(project ? "/api/issues" : null);
+  const { data: issues } = useApi<any[]>(project ? `/api/issues?projectId=${project.id}` : null);
   const { data: allNodes } = useApi<any[]>(project ? `/api/nodes?projectId=${project.id}` : null);
 
   const allTexts = useMemo(() => [

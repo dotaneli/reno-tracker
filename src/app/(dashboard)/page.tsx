@@ -111,7 +111,7 @@ export default function HomePage() {
   const [error, setError] = useState("");
 
   const { data: nodes } = useApi<any[]>(project ? `/api/nodes?projectId=${project.id}` : null);
-  const { data: issues } = useApi<any[]>(project ? "/api/issues" : null);
+  const { data: issues } = useApi<any[]>(project ? `/api/issues?projectId=${project.id}` : null);
   const fin = useFinancials(project?.id);
 
   const mutateAll = () => {

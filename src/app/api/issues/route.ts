@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { requireUser, requireNodeAccess, getUserProjectIds } from "@/lib/dal";
+import { requireUser, requireNodeAccess, requireProjectAccess, getUserProjectIds } from "@/lib/dal";
 import { json, errorResponse, handleError, parseBody, type IssueCreateBody } from "@/lib/api";
 
 export async function GET(request: Request) {
@@ -10,7 +10,9 @@ export async function GET(request: Request) {
     const status = searchParams.get("status");
 
     if (nodeId) await requireNodeAccess(userId, nodeId);
-    const projectIds = await getUserProjectIds(userId);
+    const projectId = searchParams.get("projectId");
+    if (projectId) await requireProjectAccess(userId, projectId);
+    const projectIds = projectId ? [projectId] : await getUserProjectIds(userId);
 
     const issues = await prisma.issue.findMany({
       where: {
