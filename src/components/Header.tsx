@@ -274,6 +274,11 @@ export function Header({ user }: HeaderProps) {
           )}
         </div>
       </div>
+      {/* Version toggle */}
+      <a href="https://reno-tracker-rho.vercel.app" target="_blank" rel="noopener noreferrer"
+        className="absolute end-3 bottom-0 translate-y-full rounded-b-lg bg-[var(--fg-muted)] px-2 py-0.5 text-[9px] font-bold text-white shadow-sm transition-all hover:bg-[var(--fg)] z-50">
+        ← Back to V1
+      </a>
     </header>
   );
 }
