@@ -17,7 +17,7 @@ interface HeaderProps {
 }
 
 export function Header({ user }: HeaderProps) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const { activeProject, projects, setActiveProjectId } = useProject();
   const { data: me } = useApi<any>("/api/me");
   const isAdmin = me?.isAdmin === true;
@@ -221,6 +221,7 @@ export function Header({ user }: HeaderProps) {
                     {(user.name || "?")[0].toUpperCase()}
                   </div>
                 )}
+                <span className="text-[9px] font-bold text-[var(--fg-muted)]">{lang.toUpperCase()}</span>
                 <ChevronDown size={12} className={`text-[var(--fg-muted)] transition-transform ${userDropdown ? "rotate-180" : ""}`} />
               </button>
 

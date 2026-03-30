@@ -212,10 +212,15 @@ const dict = {
   "task.markedPaid": { en: "Marked as paid", he: "סומן כשולם" },
   "prop.selectFloor": { en: "Select floor", he: "בחר קומה" },
   "export.title": { en: "Export & Share", he: "ייצוא ושיתוף" },
+  "export.csv": { en: "Download CSV", he: "הורד CSV" },
+  "export.csvDesc": { en: "Download CSV file", he: "הורד קובץ CSV" },
   "export.sheets": { en: "Google Sheets", he: "Google Sheets" },
-  "export.sheetsDesc": { en: "Download CSV for Google Sheets", he: "הורד CSV ל-Google Sheets" },
-  "export.docs": { en: "Full Report", he: "דוח מלא" },
-  "export.docsDesc": { en: "Download styled HTML report", he: "הורד דוח מעוצב" },
+  "export.sheetsDesc": { en: "Export to Google Sheets", he: "ייצוא ל-Google Sheets" },
+  "export.docs": { en: "Google Docs", he: "Google Docs" },
+  "export.docsDesc": { en: "Export styled report to Google Docs", he: "ייצוא דוח מעוצב ל-Google Docs" },
+  "export.html": { en: "Full Report", he: "דוח מלא" },
+  "export.htmlDesc": { en: "Download styled HTML report", he: "הורד דוח מעוצב" },
+  "export.googleAuthError": { en: "Please sign out and sign in again to grant Google access", he: "יש להתנתק ולהתחבר מחדש כדי לאפשר גישה ל-Google" },
   "export.whatsapp": { en: "WhatsApp", he: "WhatsApp" },
   "export.whatsappDesc": { en: "Share summary via WhatsApp", he: "שתף סיכום ב-WhatsApp" },
   "export.copied": { en: "Copied to clipboard!", he: "הועתק!" },
@@ -375,6 +380,7 @@ const dict = {
 
   // ── Share sheet ──
   "share.title": { en: "Share", he: "שתף" },
+  "share.native": { en: "Share...", he: "שתף..." },
   "share.screenshot": { en: "Screenshot", he: "צילום מסך" },
   "share.screenshotDesc": { en: "Copy or download as PNG", he: "העתק או הורד כ-PNG" },
 } as const;
@@ -391,16 +397,16 @@ interface I18nContextValue {
 const I18nContext = createContext<I18nContextValue | null>(null);
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [lang, setLangState] = useState<Lang>("en");
+  const [lang, setLangState] = useState<Lang>(() => {
+    if (typeof window === "undefined") return "en";
+    const stored = localStorage.getItem("reno-lang") as Lang | null;
+    if (stored) return stored;
+    return navigator.language?.startsWith("he") ? "he" : "en";
+  });
 
   const setLang = useCallback((l: Lang) => {
     setLangState(l);
     localStorage.setItem("reno-lang", l);
-  }, []);
-
-  useEffect(() => {
-    const stored = localStorage.getItem("reno-lang") as Lang | null;
-    if (stored === "en" || stored === "he") setLangState(stored);
   }, []);
 
   const dir: Dir = lang === "he" ? "rtl" : "ltr";

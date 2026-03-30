@@ -181,11 +181,11 @@ function NodeRow({ node, depth = 0, projectId, vendors, categories, floors, allN
 
           {/* Expand chevron */}
           <div className="shrink-0">
-            <ChevronRight size={14} className={`text-[var(--fg-muted)]/40 transition-transform ${expanded ? "rotate-90" : ""}`} />
+            <ChevronRight size={16} className={`text-[var(--fg-muted)] transition-transform ${expanded ? "rotate-90" : ""}`} />
           </div>
 
           {/* Task name */}
-          <p className={`min-w-0 flex-1 truncate font-semibold ${depth === 0 ? "text-sm" : "text-xs"} ${isDone ? "text-[var(--fg-muted)] line-through" : "text-[var(--fg)]"}`}>{tr(node.name)}</p>
+          <p className={`min-w-0 flex-1 truncate font-semibold ${depth === 0 ? "text-sm" : "text-xs"} ${isDone ? "text-[var(--fg-muted)] line-through" : "text-[var(--fg)]"}`}>{tr(node.name)}{children.length > 0 && <span className="text-[var(--fg-muted)] font-normal"> ({children.length})</span>}</p>
 
           {/* Status dot */}
           <StatusBadge status={node.status} dot />
@@ -193,10 +193,17 @@ function NodeRow({ node, depth = 0, projectId, vendors, categories, floors, allN
           {/* Compact cost */}
           {totalCost > 0 && (
             <span className="shrink-0 text-xs font-semibold text-[var(--fg-muted)]">
-              {fmtShort(totalPaid)}/{fmtShort(totalCost)}
+              <span className="text-[var(--success)]">{fmtShort(totalPaid)}</span>/{fmtShort(totalCost)}
             </span>
           )}
         </div>
+
+        {/* ── Progress bar ── */}
+        {totalCost > 0 && (
+          <div className="h-0.5 w-full bg-[var(--border-subtle)] rounded-full overflow-hidden mt-0.5 mx-2">
+            <div className="h-full bg-[var(--success)] rounded-full" style={{ width: `${Math.min(pct, 100)}%` }} />
+          </div>
+        )}
 
         {/* ── Expanded panel ── */}
         {expanded && (
@@ -221,7 +228,6 @@ function NodeRow({ node, depth = 0, projectId, vendors, categories, floors, allN
                   {node.category?.name ? tr(node.category.name) : t(`type.${node.nodeType}` as TKey)}
                 </span>
               )}
-              <StatusBadge status={node.status} />
               {node.expectedDate && (
                 <span className="flex items-center gap-0.5 text-[var(--fg-muted)]">
                   <Calendar size={10} />{new Date(node.expectedDate).toLocaleDateString(lang === "he" ? "he-IL" : "en-IL", { day: "numeric", month: "short" })}

@@ -45,7 +45,7 @@ export function StatusBadge({ status, dot = false }: { status: string; dot?: boo
 
   if (dot) {
     const color = dotColors[status] || dotColors.PENDING;
-    return <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${color}`} title={t(`status.${status}` as TKey)} />;
+    return <span className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${color}`} title={t(`status.${status}` as TKey)} />;
   }
 
   const style = statusStyles[status] || statusStyles.PENDING;

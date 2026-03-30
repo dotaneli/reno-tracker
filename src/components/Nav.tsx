@@ -8,7 +8,7 @@ import { useApi } from "@/hooks/useApi";
 import {
   Home, ListTodo, Truck, Tags, House,
   AlertTriangle, History, Users, Plug, Settings, Shield,
-  Plus, MoreHorizontal, FolderOpen, X,
+  Plus, MoreHorizontal, X,
   type LucideIcon,
 } from "lucide-react";
 
@@ -63,18 +63,14 @@ const adminItem: NavItem = { href: "/admin", label: "nav.admin", icon: Shield };
 // ── Mobile bottom tab definitions ──
 
 const mobileTabs: NavItem[] = [
-  { href: "/", label: "nav.home", icon: Home },
   { href: "/tasks", label: "nav.tasks", icon: ListTodo },
-];
-
-const directoryItems: NavItem[] = [
-  { href: "/vendors", label: "nav.vendors", icon: Truck },
-  { href: "/categories", label: "cat.title", icon: Tags },
-  { href: "/property", label: "nav.property", icon: House },
+  { href: "/", label: "nav.home", icon: Home },
 ];
 
 const moreItems: NavItem[] = [
-  { href: "/issues", label: "nav.issues", icon: AlertTriangle },
+  { href: "/vendors", label: "nav.vendors", icon: Truck },
+  { href: "/categories", label: "cat.title", icon: Tags },
+  { href: "/property", label: "nav.property", icon: House },
   { href: "/history", label: "nav.history", icon: History },
   { href: "/team", label: "nav.team", icon: Users },
   { href: "/integrations", label: "nav.integrations", icon: Plug },
@@ -88,11 +84,10 @@ export function Nav() {
   const isAdmin = me?.isAdmin === true;
 
   // Mobile popover state
-  const [mobilePopover, setMobilePopover] = useState<"directory" | "more" | null>(null);
+  const [mobilePopover, setMobilePopover] = useState<"more" | null>(null);
 
   const isActive = (href: string) => href === "/" ? pathname === "/" : pathname.startsWith(href);
 
-  const isDirectoryActive = directoryItems.some((i) => isActive(i.href));
   const isMoreActive = moreItems.some((i) => isActive(i.href)) || (isAdmin && isActive("/admin"));
 
   return (
@@ -182,16 +177,16 @@ export function Nav() {
             <span className="text-[9px] font-medium text-[var(--fg-muted)]">{t("nav.add")}</span>
           </Link>
 
-          {/* Directory */}
-          <button
-            onClick={() => setMobilePopover(mobilePopover === "directory" ? null : "directory")}
+          {/* Issues */}
+          <Link
+            href="/issues"
             className={`flex flex-col items-center gap-0.5 py-1 px-2 transition-all ${
-              isDirectoryActive || mobilePopover === "directory" ? "text-[var(--accent)]" : "text-[var(--fg-muted)]"
+              isActive("/issues") ? "text-[var(--accent)]" : "text-[var(--fg-muted)]"
             }`}
           >
-            <FolderOpen size={20} strokeWidth={isDirectoryActive ? 2 : 1.5} />
-            <span className="text-[9px] font-medium">{t("nav.directory")}</span>
-          </button>
+            <AlertTriangle size={20} strokeWidth={isActive("/issues") ? 2 : 1.5} />
+            <span className="text-[9px] font-medium">{t("nav.issues")}</span>
+          </Link>
 
           {/* More */}
           <button
@@ -213,7 +208,7 @@ export function Nav() {
           <div className="absolute bottom-14 inset-x-0 rounded-t-2xl border-t border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-3 pb-4 animate-[slideUp_0.15s_ease-out]">
             <div className="flex items-center justify-between mb-2 px-1">
               <span className="text-[12px] font-semibold text-[var(--fg)]">
-                {mobilePopover === "directory" ? t("nav.directory") : t("nav.more")}
+                {t("nav.more")}
               </span>
               <button
                 onClick={() => setMobilePopover(null)}
@@ -223,10 +218,10 @@ export function Nav() {
               </button>
             </div>
             <div className="grid grid-cols-3 gap-1.5">
-              {(mobilePopover === "directory" ? directoryItems : [
+              {[
                 ...moreItems,
                 ...(isAdmin ? [adminItem] : []),
-              ]).map(({ href, label, icon: Icon }) => {
+              ].map(({ href, label, icon: Icon }) => {
                 const active = isActive(href);
                 return (
                   <Link
