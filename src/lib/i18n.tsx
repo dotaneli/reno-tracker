@@ -212,10 +212,15 @@ const dict = {
   "task.markedPaid": { en: "Marked as paid", he: "סומן כשולם" },
   "prop.selectFloor": { en: "Select floor", he: "בחר קומה" },
   "export.title": { en: "Export & Share", he: "ייצוא ושיתוף" },
+  "export.csv": { en: "Download CSV", he: "הורד CSV" },
+  "export.csvDesc": { en: "Download CSV file", he: "הורד קובץ CSV" },
   "export.sheets": { en: "Google Sheets", he: "Google Sheets" },
-  "export.sheetsDesc": { en: "Download CSV for Google Sheets", he: "הורד CSV ל-Google Sheets" },
-  "export.docs": { en: "Full Report", he: "דוח מלא" },
-  "export.docsDesc": { en: "Download styled HTML report", he: "הורד דוח מעוצב" },
+  "export.sheetsDesc": { en: "Export to Google Sheets", he: "ייצוא ל-Google Sheets" },
+  "export.docs": { en: "Google Docs", he: "Google Docs" },
+  "export.docsDesc": { en: "Export styled report to Google Docs", he: "ייצוא דוח מעוצב ל-Google Docs" },
+  "export.html": { en: "Full Report", he: "דוח מלא" },
+  "export.htmlDesc": { en: "Download styled HTML report", he: "הורד דוח מעוצב" },
+  "export.googleAuthError": { en: "Please sign out and sign in again to grant Google access", he: "יש להתנתק ולהתחבר מחדש כדי לאפשר גישה ל-Google" },
   "export.whatsapp": { en: "WhatsApp", he: "WhatsApp" },
   "export.whatsappDesc": { en: "Share summary via WhatsApp", he: "שתף סיכום ב-WhatsApp" },
   "export.copied": { en: "Copied to clipboard!", he: "הועתק!" },
@@ -346,6 +351,38 @@ const dict = {
   // ── Settings ──
   "settings.title": { en: "Settings", he: "הגדרות" },
   "settings.themeDesc": { en: "Choose a color theme", he: "בחר ערכת צבעים" },
+
+  // ── V2 Nav sections ──
+  "nav.sectionMain": { en: "MAIN", he: "ראשי" },
+  "nav.sectionDirectory": { en: "DIRECTORY", he: "מדריך" },
+  "nav.sectionTrack": { en: "TRACK", he: "מעקב" },
+  "nav.sectionManage": { en: "MANAGE", he: "ניהול" },
+  "nav.home": { en: "Home", he: "בית" },
+  "nav.more": { en: "More", he: "עוד" },
+  "nav.directory": { en: "Directory", he: "מדריך" },
+  "nav.add": { en: "Add", he: "הוסף" },
+
+  // ── Compact toolbar ──
+  "task.filter": { en: "Filter", he: "סינון" },
+
+  // ── Milestone sections ──
+  "milestone.overdue": { en: "Overdue", he: "באיחור" },
+  "milestone.pending": { en: "Pending", he: "ממתין" },
+  "milestone.paid": { en: "Paid", he: "שולם" },
+  "milestone.overdueWas": { en: "Overdue — was due", he: "באיחור — תאריך יעד היה" },
+  "milestone.showPaid": { en: "Show paid", he: "הצג ששולמו" },
+  "milestone.hidePaid": { en: "Hide paid", he: "הסתר ששולמו" },
+
+  // ── Home tabs ──
+  "home.overview": { en: "Overview", he: "סקירה" },
+  "home.payments": { en: "Payments", he: "תשלומים" },
+  "home.issues": { en: "Issues", he: "תקלות" },
+
+  // ── Share sheet ──
+  "share.title": { en: "Share", he: "שתף" },
+  "share.native": { en: "Share...", he: "שתף..." },
+  "share.screenshot": { en: "Screenshot", he: "צילום מסך" },
+  "share.screenshotDesc": { en: "Copy or download as PNG", he: "העתק או הורד כ-PNG" },
 } as const;
 
 export type TKey = keyof typeof dict;
@@ -360,16 +397,16 @@ interface I18nContextValue {
 const I18nContext = createContext<I18nContextValue | null>(null);
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [lang, setLangState] = useState<Lang>("en");
+  const [lang, setLangState] = useState<Lang>(() => {
+    if (typeof window === "undefined") return "en";
+    const stored = localStorage.getItem("reno-lang") as Lang | null;
+    if (stored) return stored;
+    return navigator.language?.startsWith("he") ? "he" : "en";
+  });
 
   const setLang = useCallback((l: Lang) => {
     setLangState(l);
     localStorage.setItem("reno-lang", l);
-  }, []);
-
-  useEffect(() => {
-    const stored = localStorage.getItem("reno-lang") as Lang | null;
-    if (stored === "en" || stored === "he") setLangState(stored);
   }, []);
 
   const dir: Dir = lang === "he" ? "rtl" : "ltr";
