@@ -12,7 +12,7 @@ import {
 } from "@dnd-kit/core";
 import { useDraggable } from "@dnd-kit/core";
 import { InlineNodeEdit } from "./InlineNodeEdit";
-import { ChevronRight, DollarSign, Calendar, Pencil, X, Trash2, Plus, GripVertical, CornerLeftUp, CheckCircle2, CircleDollarSign } from "lucide-react";
+import { ChevronRight, Calendar, Pencil, X, Trash2, Plus, GripVertical, CornerLeftUp, CheckCircle2, CircleDollarSign } from "lucide-react";
 
 const inp = "w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)] placeholder-[var(--fg-muted)]/60 outline-none focus:border-[var(--accent)]";
 
