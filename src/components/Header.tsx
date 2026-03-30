@@ -170,7 +170,7 @@ export function Header({ user }: HeaderProps) {
         </div>
       </div>
       {/* Version toggle */}
-      <a href="https://reno-tracker-7i67wqy80-dotanelis-projects.vercel.app" target="_blank" rel="noopener noreferrer"
+      <a href="https://reno-tracker-v2.vercel.app" target="_blank" rel="noopener noreferrer"
         className="absolute end-3 bottom-0 translate-y-full rounded-b-lg bg-[var(--accent)] px-2 py-0.5 text-[9px] font-bold text-white shadow-sm transition-all hover:bg-[var(--accent-hover)] z-50">
         Try V2 →
       </a>
