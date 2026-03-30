@@ -346,6 +346,21 @@ const dict = {
   // ── Settings ──
   "settings.title": { en: "Settings", he: "הגדרות" },
   "settings.themeDesc": { en: "Choose a color theme", he: "בחר ערכת צבעים" },
+
+  // ── V2 Nav sections ──
+  "nav.sectionMain": { en: "MAIN", he: "ראשי" },
+  "nav.sectionDirectory": { en: "DIRECTORY", he: "מדריך" },
+  "nav.sectionTrack": { en: "TRACK", he: "מעקב" },
+  "nav.sectionManage": { en: "MANAGE", he: "ניהול" },
+  "nav.home": { en: "Home", he: "בית" },
+  "nav.more": { en: "More", he: "עוד" },
+  "nav.directory": { en: "Directory", he: "מדריך" },
+  "nav.add": { en: "Add", he: "הוסף" },
+
+  // ── Share sheet ──
+  "share.title": { en: "Share", he: "שתף" },
+  "share.screenshot": { en: "Screenshot", he: "צילום מסך" },
+  "share.screenshotDesc": { en: "Copy or download as PNG", he: "העתק או הורד כ-PNG" },
 } as const;
 
 export type TKey = keyof typeof dict;

@@ -46,6 +46,7 @@ html { scroll-behavior: smooth; }
 /* Smooth page transitions */
 main { animation: fadeIn 0.3s ease-out; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
 
 /* Universal interactive lift — applied to all interactive items */
 .lift {
