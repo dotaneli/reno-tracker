@@ -47,6 +47,7 @@ html { scroll-behavior: smooth; }
 main { animation: fadeIn 0.3s ease-out; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes slideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pulse-border { 0%, 100% { border-left-color: var(--alert); } 50% { border-left-color: transparent; } }
 
 /* Universal interactive lift — applied to all interactive items */
 .lift {

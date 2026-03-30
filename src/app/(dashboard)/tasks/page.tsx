@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useProject } from "@/hooks/useProject";
 import { useI18n, type TKey } from "@/lib/i18n";
 import { useApi, apiPost, apiPatch, apiDelete } from "@/hooks/useApi";
@@ -13,7 +13,7 @@ import { RoomMultiSelect } from "@/components/RoomMultiSelect";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ItemMilestones } from "@/components/ItemMilestones";
 import { InlineNodeEdit } from "@/components/InlineNodeEdit";
-import { Plus, X, ChevronDown, Search, List, LayoutGrid, ArrowUpDown, Wallet, CheckCircle2, CircleDollarSign, Pencil, Trash2 } from "lucide-react";
+import { Plus, X, ChevronDown, Search, List, LayoutGrid, CheckCircle2, CircleDollarSign, Pencil, Trash2, SlidersHorizontal } from "lucide-react";
 import { mutate } from "swr";
 
 const input = "w-full rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] px-4 py-3 text-sm text-[var(--fg)] placeholder-[var(--fg-muted)]/60 outline-none transition-all focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/10";
@@ -33,6 +33,10 @@ export default function TasksPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("default");
   const [unpaidOnly, setUnpaidOnly] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const filterRef = useRef<HTMLDivElement>(null);
 
   const { activeProject: project } = useProject();
   const { data: tree } = useApi<any[]>(project ? `/api/nodes?projectId=${project.id}&tree=true` : null);
@@ -52,6 +56,21 @@ export default function TasksPage() {
   const mutateAll = () => { mutate(`/api/nodes?projectId=${project?.id}&tree=true`); mutate(`/api/nodes?projectId=${project?.id}`); mutate(`/api/vendors?projectId=${project?.id}`); mutate(`/api/categories?projectId=${project?.id}`); mutate(`/api/projects/${project?.id}/milestones`); mutate("/api/projects"); };
 
   const fmt = (n: number) => new Intl.NumberFormat(lang === "he" ? "he-IL" : "en-IL", { style: "currency", currency: "ILS", maximumFractionDigits: 0 }).format(n);
+
+  // Close filter dropdown on outside click
+  useEffect(() => {
+    if (!filterOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (filterRef.current && !filterRef.current.contains(e.target as Node)) setFilterOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [filterOpen]);
+
+  // Focus search input when opened
+  useEffect(() => {
+    if (searchOpen && searchRef.current) searchRef.current.focus();
+  }, [searchOpen]);
 
   // ── Search, Filter & Sort (for card view — operates on flat list) ──
   const filteredNodes = useMemo(() => {
@@ -163,113 +182,108 @@ export default function TasksPage() {
           <h1 className="text-2xl font-bold tracking-tight text-[var(--fg)]">{t("task.title")}</h1>
           <p className="mt-0.5 text-sm text-[var(--fg-muted)]">{rootCount} {t("dash.groups").toLowerCase()} · {totalCount} {t("dash.tasks").toLowerCase()}</p>
         </div>
-        <button onClick={() => { setShowAddForm(!showAddForm); setEditNodeId(null); }}
-          className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all ${showAddForm ? "bg-[var(--border-subtle)] text-[var(--fg-secondary)]" : "bg-[var(--fg)] text-[var(--bg-elevated)] shadow-lg shadow-[var(--fg)]/10"}`}>
-          {showAddForm ? <X size={16} /> : <Plus size={16} />}
-          {showAddForm ? t("task.cancel") : t("task.addTask")}
-        </button>
       </div>
 
-      {/* Budget Bar */}
-      {!fin.loading && (
-        <div className="grid grid-cols-2 gap-x-3 gap-y-2 rounded-2xl bg-[var(--fg)] px-4 py-3 md:px-6 md:py-4 text-[var(--bg-elevated)] sm:flex sm:flex-wrap sm:items-center sm:gap-4">
-          <div className="flex items-center gap-2 col-span-2 sm:col-span-1">
-            <Wallet size={16} className="text-[var(--accent)]" />
-            <span className="text-xs font-medium opacity-70">{t("dash.budget")}</span>
-            <span className="text-sm font-bold">{fmt(fin.totalBudget)}</span>
-          </div>
-          <div className="h-4 w-px bg-white/20 hidden sm:block" />
-          <div className="flex items-center gap-1.5 text-xs">
-            <span className="opacity-70">{t("costs.totalCost")}</span>
-            <span className="font-bold">{fmt(fin.totalCost)}</span>
-          </div>
-          <div className="h-4 w-px bg-white/20 hidden sm:block" />
-          <div className="flex items-center gap-1.5 text-xs">
-            <span className="opacity-70">{t("costs.totalPaid")}</span>
-            <span className="font-bold text-[#78B080]">{fmt(fin.totalPaid)}</span>
-          </div>
-          <div className="h-4 w-px bg-white/20 hidden sm:block" />
-          <div className="flex items-center gap-1.5 text-xs">
-            <span className="opacity-70">{t("costs.totalRemaining")}</span>
-            <span className="font-bold text-amber-300">{fmt(fin.remainingToPay)}</span>
-          </div>
-          {fin.unscheduled > 0 && (
-            <>
-              <div className="h-4 w-px bg-white/20 hidden sm:block" />
-              <div className="flex items-center gap-1.5 text-xs">
-                <span className="opacity-70">{t("costs.unscheduled")}</span>
-                <span className="font-bold text-red-400">{fmt(fin.unscheduled)}</span>
-              </div>
-            </>
-          )}
-          <div className="col-span-2 sm:col-span-1 sm:ms-auto flex items-center gap-1.5 text-xs">
-            <span className="opacity-70">{t("task.budgetRemaining")}</span>
-            <span className={`font-bold ${fin.budgetRemaining >= 0 ? "text-[#78B080]" : "text-red-400"}`}>{fmt(fin.budgetRemaining)}</span>
-          </div>
-        </div>
-      )}
-
-      {/* Search + Sort + View Toggle */}
-      <div className="flex flex-wrap items-center gap-3">
-        {/* Search */}
-        <div className="relative flex-1 min-w-[200px]">
-          <Search size={16} className="pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 text-[var(--fg-muted)]" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={t("task.search")}
-            className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] py-2.5 pe-4 ps-10 text-sm text-[var(--fg)] placeholder-[var(--fg-muted)]/60 outline-none transition-all focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/10"
-          />
-          {searchQuery && (
-            <button onClick={() => setSearchQuery("")} className="absolute end-3 top-1/2 -translate-y-1/2 text-[var(--fg-muted)] hover:text-[var(--fg)]">
+      {/* ── Compact Toolbar ── */}
+      <div className="flex items-center gap-2">
+        {/* Search icon / expandable input */}
+        {searchOpen ? (
+          <div className="relative flex-1 min-w-[160px] max-w-xs">
+            <Search size={14} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-[var(--fg-muted)]" />
+            <input
+              ref={searchRef}
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Escape") { setSearchOpen(false); setSearchQuery(""); } }}
+              placeholder={t("task.search")}
+              className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] py-2 pe-8 ps-9 text-sm text-[var(--fg)] placeholder-[var(--fg-muted)]/60 outline-none transition-all focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/10"
+            />
+            <button onClick={() => { setSearchOpen(false); setSearchQuery(""); }} className="absolute end-2.5 top-1/2 -translate-y-1/2 text-[var(--fg-muted)] hover:text-[var(--fg)]">
               <X size={14} />
             </button>
+          </div>
+        ) : (
+          <button onClick={() => setSearchOpen(true)} className="flex items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] p-2.5 text-[var(--fg-muted)] hover:text-[var(--fg)] hover:border-[var(--accent)]/30 transition-all">
+            <Search size={16} />
+          </button>
+        )}
+
+        {/* Filter button + dropdown */}
+        <div className="relative" ref={filterRef}>
+          <button
+            onClick={() => setFilterOpen(!filterOpen)}
+            className={`flex items-center gap-1.5 rounded-xl border px-3 py-2.5 text-xs font-medium transition-all ${
+              filterOpen || sortKey !== "default" || unpaidOnly
+                ? "border-[var(--accent)]/40 bg-[var(--accent-soft)] text-[var(--accent)]"
+                : "border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--fg-muted)] hover:text-[var(--fg)]"
+            }`}
+          >
+            <SlidersHorizontal size={14} />
+            {t("task.filter")}
+            <ChevronDown size={12} className={`transition-transform ${filterOpen ? "rotate-180" : ""}`} />
+          </button>
+          {filterOpen && (
+            <div className="absolute start-0 top-full z-30 mt-1 w-56 rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] p-3 shadow-xl space-y-3">
+              {/* Sort by */}
+              <div>
+                <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--fg-muted)]">{t("task.sortBy")}</p>
+                <div className="relative">
+                  <select
+                    value={sortKey}
+                    onChange={(e) => setSortKey(e.target.value as SortKey)}
+                    className="w-full appearance-none rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-xs font-medium text-[var(--fg)] outline-none focus:border-[var(--accent)]"
+                  >
+                    <option value="default">{t("task.sortDefault")}</option>
+                    <option value="price">{t("task.sortPrice")}</option>
+                    <option value="category">{t("task.sortCategory")}</option>
+                    <option value="vendor">{t("task.sortVendor")}</option>
+                    <option value="status">{t("task.sortStatus")}</option>
+                    <option value="payment">{t("task.sortPayment")}</option>
+                  </select>
+                  <ChevronDown size={12} className="pointer-events-none absolute end-2.5 top-1/2 -translate-y-1/2 text-[var(--fg-muted)]" />
+                </div>
+              </div>
+              {/* Unpaid toggle */}
+              <button
+                onClick={() => setUnpaidOnly(!unpaidOnly)}
+                className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-all ${unpaidOnly ? "bg-[var(--alert-soft)] text-[var(--alert)]" : "bg-[var(--fg)]/5 text-[var(--fg-muted)] hover:text-[var(--fg)]"}`}
+              >
+                <CircleDollarSign size={14} />
+                {t("costs.unpaidOnly")}
+                {unpaidOnly && <span className="ms-auto text-[var(--alert)]">✓</span>}
+              </button>
+            </div>
           )}
         </div>
 
-        {/* Sort */}
-        <div className="relative">
-          <ArrowUpDown size={14} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-[var(--fg-muted)]" />
-          <select
-            value={sortKey}
-            onChange={(e) => setSortKey(e.target.value as SortKey)}
-            className="appearance-none rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] py-2.5 pe-8 ps-9 text-xs font-medium text-[var(--fg)] outline-none transition-all focus:border-[var(--accent)]"
-          >
-            <option value="default">{t("task.sortDefault")}</option>
-            <option value="price">{t("task.sortPrice")}</option>
-            <option value="category">{t("task.sortCategory")}</option>
-            <option value="vendor">{t("task.sortVendor")}</option>
-            <option value="status">{t("task.sortStatus")}</option>
-            <option value="payment">{t("task.sortPayment")}</option>
-          </select>
-          <ChevronDown size={12} className="pointer-events-none absolute end-2.5 top-1/2 -translate-y-1/2 text-[var(--fg-muted)]" />
-        </div>
-
-        {/* Unpaid Filter */}
-        <button
-          onClick={() => setUnpaidOnly(!unpaidOnly)}
-          className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium transition-all ${unpaidOnly ? "border-[var(--alert)]/40 bg-[var(--alert-soft)] text-[var(--alert)]" : "border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--fg-muted)] hover:text-[var(--fg)]"}`}
-        >
-          <CircleDollarSign size={14} />
-          {t("costs.unpaidOnly")}
-        </button>
-
-        {/* View Toggle */}
+        {/* View toggle — icon only */}
         <div className="flex rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] p-0.5">
           <button
             onClick={() => setViewMode("list")}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${viewMode === "list" ? "bg-[var(--fg)] text-[var(--bg-elevated)] shadow-sm" : "text-[var(--fg-muted)] hover:text-[var(--fg)]"}`}
+            className={`flex items-center justify-center rounded-lg p-2 transition-all ${viewMode === "list" ? "bg-[var(--fg)] text-[var(--bg-elevated)] shadow-sm" : "text-[var(--fg-muted)] hover:text-[var(--fg)]"}`}
+            title={t("task.viewList")}
           >
-            <List size={14} /> {t("task.viewList")}
+            <List size={14} />
           </button>
           <button
             onClick={() => setViewMode("cards")}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${viewMode === "cards" ? "bg-[var(--fg)] text-[var(--bg-elevated)] shadow-sm" : "text-[var(--fg-muted)] hover:text-[var(--fg)]"}`}
+            className={`flex items-center justify-center rounded-lg p-2 transition-all ${viewMode === "cards" ? "bg-[var(--fg)] text-[var(--bg-elevated)] shadow-sm" : "text-[var(--fg-muted)] hover:text-[var(--fg)]"}`}
+            title={t("task.viewCards")}
           >
-            <LayoutGrid size={14} /> {t("task.viewCards")}
+            <LayoutGrid size={14} />
           </button>
         </div>
+
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* Add Task button */}
+        <button onClick={() => { setShowAddForm(!showAddForm); setEditNodeId(null); }}
+          className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all ${showAddForm ? "bg-[var(--border-subtle)] text-[var(--fg-secondary)]" : "bg-[var(--accent)] text-white shadow-lg shadow-[var(--accent)]/20"}`}>
+          {showAddForm ? <X size={16} /> : <Plus size={16} />}
+          {showAddForm ? t("task.cancel") : t("task.addTask")}
+        </button>
       </div>
 
       {/* Add Form */}

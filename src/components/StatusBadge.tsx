@@ -21,8 +21,33 @@ const statusStyles: Record<string, string> = {
   OVERDUE: "bg-[var(--alert-soft)] text-[var(--alert)] ring-[var(--alert)]/15",
 };
 
-export function StatusBadge({ status }: { status: string }) {
+const dotColors: Record<string, string> = {
+  NOT_STARTED: "bg-[var(--fg-muted)]",
+  PENDING: "bg-[var(--fg-muted)]",
+  IN_PROGRESS: "bg-[var(--accent)]",
+  PROCESSING: "bg-[var(--accent)]",
+  ORDERED: "bg-amber-500",
+  DELIVERED: "bg-[var(--success)]",
+  INSTALLED: "bg-[var(--success)]",
+  COMPLETED: "bg-[var(--success)]",
+  RESOLVED: "bg-[var(--success)]",
+  PAID: "bg-[var(--success)]",
+  CANCELLED: "bg-red-500",
+  ON_HOLD: "bg-orange-500",
+  OPEN: "bg-[var(--alert)]",
+  FAILED: "bg-red-500",
+  DUE: "bg-amber-500",
+  OVERDUE: "bg-[var(--alert)]",
+};
+
+export function StatusBadge({ status, dot = false }: { status: string; dot?: boolean }) {
   const { t } = useI18n();
+
+  if (dot) {
+    const color = dotColors[status] || dotColors.PENDING;
+    return <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${color}`} title={t(`status.${status}` as TKey)} />;
+  }
+
   const style = statusStyles[status] || statusStyles.PENDING;
   const key = `status.${status}` as TKey;
 

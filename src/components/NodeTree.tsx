@@ -16,6 +16,19 @@ import { ChevronRight, DollarSign, Calendar, Pencil, X, Trash2, Plus, GripVertic
 
 const inp = "w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)] placeholder-[var(--fg-muted)]/60 outline-none focus:border-[var(--accent)]";
 
+/** Abbreviate cost: 5000 -> "₪5K", 1200000 -> "₪1.2M" */
+function fmtShort(n: number): string {
+  if (n >= 1_000_000) {
+    const m = n / 1_000_000;
+    return `₪${m % 1 === 0 ? m.toFixed(0) : m.toFixed(1)}M`;
+  }
+  if (n >= 1_000) {
+    const k = n / 1_000;
+    return `₪${k % 1 === 0 ? k.toFixed(0) : k.toFixed(1)}K`;
+  }
+  return `₪${n}`;
+}
+
 interface NodeTreeProps {
   nodes: any[];
   depth?: number;
@@ -117,8 +130,7 @@ function DraggableNode(props: Omit<NodeTreeProps, "nodes"> & { node: any; fmt: (
 
 function NodeRow({ node, depth = 0, projectId, vendors, categories, floors, allNodes, editNodeId, onMutate, onEdit, onEditDone, onEditCancel, tr, fmt, parentVendor, parentCost, allProjectMilestones, dragListeners, isOver }: Omit<NodeTreeProps, "nodes"> & { node: any; fmt: (n: number | null) => string; dragListeners?: any; isOver?: boolean }) {
   const { t, lang } = useI18n();
-  const [expanded, setExpanded] = useState(true);
-  const [showMilestones, setShowMilestones] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ name: "", categoryId: "", vendorId: "", expectedCost: "", expectedDate: "" });
 
@@ -126,7 +138,6 @@ function NodeRow({ node, depth = 0, projectId, vendors, categories, floors, allN
   const hasChildren = children.length > 0;
   const hasCost = node.expectedCost != null;
   const ownCost = Number(node.expectedCost || 0);
-  const aggregateCost = hasChildren ? sumCosts(node) : 0;
   const nodeVendorName = node.vendor ? tr(node.vendor.name) : null;
   const inheritedVendor = nodeVendorName || parentVendor;
   const isDone = node.status === "COMPLETED";
@@ -157,99 +168,107 @@ function NodeRow({ node, depth = 0, projectId, vendors, categories, floors, allN
 
   return (
     <div>
-      <div className={`group rounded-xl border bg-[var(--bg-elevated)] transition-all duration-200 hover:scale-[1.01] hover:shadow-[0_4px_16px_rgba(26,23,20,0.08)] ${
+      <div className={`group rounded-xl border bg-[var(--bg-elevated)] transition-all duration-200 hover:shadow-[0_4px_16px_rgba(26,23,20,0.08)] ${
         isOver ? "border-[var(--accent)] bg-[var(--accent-soft)] scale-[1.02]" : "border-[var(--border-subtle)] hover:border-[var(--accent)]/20"
       } ${depth === 0 ? "shadow-[0_1px_3px_rgba(26,23,20,0.04)]" : ""}`}>
 
-        {/* Main row */}
-        <div className="p-2 md:p-3">
-          <div className="flex items-start gap-1">
-            {/* Drag + Expand — compact */}
-            <div className="flex shrink-0 items-center">
-              <button {...dragListeners} className="cursor-grab rounded-md p-1.5 text-[var(--fg-muted)]/30 hover:text-[var(--fg)] active:cursor-grabbing" style={{ touchAction: "none" }}>
-                <GripVertical size={14} />
-              </button>
-              <button onClick={() => setExpanded(!expanded)} className="rounded-md p-1 text-[var(--fg-muted)]/40 hover:text-[var(--fg-muted)]">
-                <ChevronRight size={14} className={`transition-transform ${expanded && hasChildren ? "rotate-90" : ""} ${!hasChildren ? "opacity-0" : ""}`} />
-              </button>
-            </div>
+        {/* ── Collapsed row (always visible) ── */}
+        <div className="flex items-center gap-1 p-2 md:p-3 cursor-pointer" onClick={() => setExpanded(!expanded)}>
+          {/* Drag handle — desktop only */}
+          <button {...dragListeners} onClick={(e) => e.stopPropagation()} className="hidden md:block cursor-grab rounded-md p-1 text-[var(--fg-muted)]/30 hover:text-[var(--fg)] active:cursor-grabbing" style={{ touchAction: "none" }}>
+            <GripVertical size={14} />
+          </button>
 
-            {/* Content */}
-            <div className="min-w-0 flex-1">
-              {/* Name + badges */}
-              <div className="flex flex-wrap items-center gap-1.5">
-                <p className={`font-semibold ${depth === 0 ? "text-sm" : "text-xs"} ${isDone ? "text-[var(--fg-muted)] line-through" : "text-[var(--fg)]"}`}>{tr(node.name)}</p>
+          {/* Expand chevron */}
+          <div className="shrink-0">
+            <ChevronRight size={14} className={`text-[var(--fg-muted)]/40 transition-transform ${expanded ? "rotate-90" : ""}`} />
+          </div>
+
+          {/* Task name */}
+          <p className={`min-w-0 flex-1 truncate font-semibold ${depth === 0 ? "text-sm" : "text-xs"} ${isDone ? "text-[var(--fg-muted)] line-through" : "text-[var(--fg)]"}`}>{tr(node.name)}</p>
+
+          {/* Status dot */}
+          <StatusBadge status={node.status} dot />
+
+          {/* Compact cost */}
+          {totalCost > 0 && (
+            <span className="shrink-0 text-xs font-semibold text-[var(--fg-muted)]">
+              {fmtShort(totalPaid)}/{fmtShort(totalCost)}
+            </span>
+          )}
+        </div>
+
+        {/* ── Expanded panel ── */}
+        {expanded && (
+          <div className="border-t border-[var(--border-subtle)] px-2 pb-2 md:px-3 md:pb-3">
+            {/* Full cost breakdown */}
+            {totalCost > 0 && (
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 pt-2 text-xs">
+                <span className="font-semibold text-[var(--success)]">{fmt(totalPaid)}</span>
+                <span className="text-[var(--fg-muted)]">/</span>
+                <span className="font-semibold text-[var(--fg)]">{fmt(totalCost)}</span>
+                {totalPaid > 0 && <span className="rounded-md bg-[var(--success-soft)] px-1.5 py-0.5 text-[9px] font-bold text-[var(--success)]">{pct}%</span>}
+                {totalRemaining > 0 && <span className="font-medium text-[var(--alert)]">{fmt(totalRemaining)} {t("task.left")}</span>}
+              </div>
+            )}
+
+            {/* Info tags */}
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
+              {nodeVendorName && <span className="font-semibold text-[var(--fg-secondary)]">{nodeVendorName}</span>}
+              {!nodeVendorName && parentVendor && <span className="italic text-[var(--fg-muted)]">{parentVendor}</span>}
               {(node.category?.name || node.nodeType) && (
                 <span className="rounded bg-[var(--accent-soft)] px-1.5 py-px text-[8px] font-bold uppercase tracking-wider text-[var(--accent)]">
                   {node.category?.name ? tr(node.category.name) : t(`type.${node.nodeType}` as TKey)}
                 </span>
               )}
               <StatusBadge status={node.status} />
-            </div>
-
-            {/* Info line — wraps naturally */}
-            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
-              {nodeVendorName && <span className="font-semibold text-[var(--fg-secondary)]">{nodeVendorName}</span>}
-              {!nodeVendorName && parentVendor && <span className="italic text-[var(--fg-muted)]">{parentVendor}</span>}
-
-              {totalCost > 0 && (
-                <span className="flex flex-wrap items-center gap-1 font-semibold">
-                  <span className="text-[var(--success)]">{fmt(totalPaid)}</span>
-                  <span className="text-[var(--fg-muted)]">/</span>
-                  <span className="text-[var(--fg)]">{fmt(totalCost)}</span>
-                  {totalPaid > 0 && <span className="rounded-md bg-[var(--success-soft)] px-1.5 py-0.5 text-[9px] font-bold text-[var(--success)]">{pct}%</span>}
-                  {totalRemaining > 0 && <span className="font-medium text-[var(--alert)]">{fmt(totalRemaining)} {t("task.left")}</span>}
-                </span>
-              )}
-
               {node.expectedDate && (
                 <span className="flex items-center gap-0.5 text-[var(--fg-muted)]">
                   <Calendar size={10} />{new Date(node.expectedDate).toLocaleDateString(lang === "he" ? "he-IL" : "en-IL", { day: "numeric", month: "short" })}
                 </span>
               )}
             </div>
-            </div>
-          </div>
 
-          {/* Actions — compact row */}
-          <div className="flex flex-wrap items-center gap-1 mt-1.5 ms-7">
-            {!isDone && (
-              <button onClick={handleMarkDone} className="rounded-lg bg-[var(--success-soft)] p-1.5 text-[var(--success)] hover:bg-[var(--success)] hover:text-white" title={t("task.markDone")}>
-                <CheckCircle2 size={14} />
-              </button>
-            )}
-            {hasCost && totalPaid < totalCost && (
-              <button onClick={handleMarkPaid} className="rounded-lg bg-amber-50 p-1.5 text-amber-600 hover:bg-amber-500 hover:text-white" title={t("task.markPaid")}>
-                <CircleDollarSign size={14} />
-              </button>
-            )}
+            {/* Action bar */}
+            <div className="flex flex-wrap items-center gap-1 mt-2">
+              {!isDone && (
+                <button onClick={handleMarkDone} className="rounded-lg bg-[var(--success-soft)] p-1.5 text-[var(--success)] hover:bg-[var(--success)] hover:text-white" title={t("task.markDone")}>
+                  <CheckCircle2 size={14} />
+                </button>
+              )}
+              {hasCost && totalPaid < totalCost && (
+                <button onClick={handleMarkPaid} className="rounded-lg bg-amber-50 p-1.5 text-amber-600 hover:bg-amber-500 hover:text-white" title={t("task.markPaid")}>
+                  <CircleDollarSign size={14} />
+                </button>
+              )}
+              {hasCost && (
+                <button className={`rounded-lg px-2 py-1.5 text-[10px] font-bold bg-[var(--fg)]/5 text-[var(--fg)] hover:bg-[var(--accent)] hover:text-white`}>
+                  {t("task.milestones")}
+                </button>
+              )}
+              <button onClick={() => { setAdding(!adding); }} className="rounded-lg bg-[var(--fg)]/5 p-1.5 text-[var(--fg)] hover:bg-[var(--fg)] hover:text-[var(--bg-elevated)]"><Plus size={14} /></button>
+              {editNodeId === node.id ? (
+                <button onClick={() => onEditCancel?.()} className="rounded-lg bg-[var(--accent)] p-1.5 text-white hover:bg-[var(--alert)]" title={t("task.cancel")}><X size={13} /></button>
+              ) : (
+                <button onClick={() => onEdit(node)} className="rounded-lg bg-[var(--fg)]/5 p-1.5 text-[var(--fg)] hover:bg-[var(--accent)] hover:text-white" title={t("crud.edit")}><Pencil size={13} /></button>
+              )}
+              <button onClick={handleDelete} className="rounded-lg bg-[var(--fg)]/5 p-1.5 text-[var(--fg)] hover:bg-[var(--alert)] hover:text-white"><Trash2 size={13} /></button>
+            </div>
+
+            {/* Milestones panel */}
             {hasCost && (
-              <button onClick={() => setShowMilestones(!showMilestones)} className={`rounded-lg px-2 py-1.5 text-[10px] font-bold ${showMilestones ? "bg-[var(--accent)] text-white" : "bg-[var(--fg)]/5 text-[var(--fg)] hover:bg-[var(--accent)] hover:text-white"}`}>
-                {t("task.milestones")}
-              </button>
+              <div className="mt-2">
+                <ItemMilestones itemId={node.id} expectedCost={ownCost} onMutate={onMutate} prefetchedMilestones={node.milestones || allProjectMilestones?.filter((m: any) => m.nodeId === node.id)} />
+              </div>
             )}
-            <button onClick={() => { setAdding(!adding); setExpanded(true); }} className="rounded-lg bg-[var(--fg)]/5 p-1.5 text-[var(--fg)] hover:bg-[var(--fg)] hover:text-[var(--bg-elevated)]"><Plus size={14} /></button>
-            {editNodeId === node.id ? (
-              <button onClick={() => onEditCancel?.()} className="rounded-lg bg-[var(--accent)] p-1.5 text-white hover:bg-[var(--alert)]" title={t("task.cancel")}><X size={13} /></button>
-            ) : (
-              <button onClick={() => onEdit(node)} className="rounded-lg bg-[var(--fg)]/5 p-1.5 text-[var(--fg)] hover:bg-[var(--accent)] hover:text-white" title={t("crud.edit")}><Pencil size={13} /></button>
-            )}
-            <button onClick={handleDelete} className="rounded-lg bg-[var(--fg)]/5 p-1.5 text-[var(--fg)] hover:bg-[var(--alert)] hover:text-white"><Trash2 size={13} /></button>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Inline edit */}
       {editNodeId === node.id && onEditDone && onEditCancel && (
         <div className="ms-3 md:ms-7 mt-1 rounded-xl border border-[var(--accent)]/30 bg-[var(--bg-elevated)] p-3 shadow-md">
           <InlineNodeEdit node={node} projectId={projectId} allNodes={allNodes || []} vendors={vendors} categories={categories} floors={floors} tr={tr} onDone={onEditDone} onCancel={onEditCancel} />
-        </div>
-      )}
-
-      {/* Milestones */}
-      {showMilestones && hasCost && (
-        <div className="ms-3 md:ms-7 mt-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-3">
-          <ItemMilestones itemId={node.id} expectedCost={ownCost} onMutate={onMutate} prefetchedMilestones={node.milestones || allProjectMilestones?.filter((m: any) => m.nodeId === node.id)} />
         </div>
       )}
 
@@ -277,7 +296,7 @@ function NodeRow({ node, depth = 0, projectId, vendors, categories, floors, allN
 
       {/* Children */}
       {expanded && hasChildren && (
-        <NodeTree nodes={children} depth={(depth ?? 0) + 1} projectId={projectId} vendors={vendors} categories={categories} floors={floors} allNodes={allNodes} editNodeId={editNodeId} onMutate={onMutate} onEdit={onEdit} onEditDone={onEditDone} onEditCancel={onEditCancel} tr={tr} parentVendor={inheritedVendor} parentCost={hasCost ? ownCost : parentCost} />
+        <NodeTree nodes={children} depth={(depth ?? 0) + 1} projectId={projectId} vendors={vendors} categories={categories} floors={floors} allNodes={allNodes} editNodeId={editNodeId} onMutate={onMutate} onEdit={onEdit} onEditDone={onEditDone} onEditCancel={onEditCancel} tr={tr} parentVendor={inheritedVendor} parentCost={hasCost ? ownCost : parentCost} allProjectMilestones={allProjectMilestones} />
       )}
     </div>
   );

@@ -357,6 +357,22 @@ const dict = {
   "nav.directory": { en: "Directory", he: "מדריך" },
   "nav.add": { en: "Add", he: "הוסף" },
 
+  // ── Compact toolbar ──
+  "task.filter": { en: "Filter", he: "סינון" },
+
+  // ── Milestone sections ──
+  "milestone.overdue": { en: "Overdue", he: "באיחור" },
+  "milestone.pending": { en: "Pending", he: "ממתין" },
+  "milestone.paid": { en: "Paid", he: "שולם" },
+  "milestone.overdueWas": { en: "Overdue — was due", he: "באיחור — תאריך יעד היה" },
+  "milestone.showPaid": { en: "Show paid", he: "הצג ששולמו" },
+  "milestone.hidePaid": { en: "Hide paid", he: "הסתר ששולמו" },
+
+  // ── Home tabs ──
+  "home.overview": { en: "Overview", he: "סקירה" },
+  "home.payments": { en: "Payments", he: "תשלומים" },
+  "home.issues": { en: "Issues", he: "תקלות" },
+
   // ── Share sheet ──
   "share.title": { en: "Share", he: "שתף" },
   "share.screenshot": { en: "Screenshot", he: "צילום מסך" },

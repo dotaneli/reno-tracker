@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useI18n } from "@/lib/i18n";
 import { useApi } from "@/hooks/useApi";
 import { StatusBadge } from "./StatusBadge";
-import { Plus, Upload, CheckCircle2, Trash2, FileText, Pencil, X } from "lucide-react";
+import { Plus, Upload, CheckCircle2, Trash2, FileText, Pencil, X, ChevronDown } from "lucide-react";
 import { mutate } from "swr";
 
 const input = "w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)] placeholder-[var(--fg-muted)]/60 outline-none focus:border-[var(--accent)]";
@@ -16,6 +16,13 @@ interface Props {
   prefetchedMilestones?: any[];
 }
 
+/** Check if a milestone is overdue: status not PAID and dueDate in the past */
+function isOverdue(m: any): boolean {
+  if (m.status === "PAID") return false;
+  if (!m.dueDate) return false;
+  return new Date(m.dueDate) < new Date(new Date().toDateString());
+}
+
 export function ItemMilestones({ itemId, expectedCost, onMutate: onParentMutate, prefetchedMilestones }: Props) {
   const { t, lang } = useI18n();
   const [showAddForm, setShowAddForm] = useState(false);
@@ -25,6 +32,7 @@ export function ItemMilestones({ itemId, expectedCost, onMutate: onParentMutate,
   const [editForm, setEditForm] = useState({ label: "", amount: "", dueDate: "", status: "PENDING" });
   const [file, setFile] = useState<File | null>(null);
   const [editFile, setEditFile] = useState<File | null>(null);
+  const [showPaid, setShowPaid] = useState(false);
 
   // Use prefetched data if available, otherwise fetch per-item (fallback)
   const { data: fetchedMilestones } = useApi<any[]>(prefetchedMilestones ? null : `/api/nodes/${itemId}/milestones`, { keepPreviousData: true });
@@ -34,8 +42,29 @@ export function ItemMilestones({ itemId, expectedCost, onMutate: onParentMutate,
   const fmt = (n: number) =>
     new Intl.NumberFormat(lang === "he" ? "he-IL" : "en-IL", { style: "currency", currency: "ILS", maximumFractionDigits: 0 }).format(n);
 
+  const fmtDate = (d: string) =>
+    new Date(d).toLocaleDateString(lang === "he" ? "he-IL" : "en-IL", { day: "numeric", month: "short", year: "numeric" });
+
   const totalPaid = milestones?.filter((m: any) => m.status === "PAID").reduce((s: number, m: any) => s + Number(m.amount), 0) || 0;
   const totalDue = milestones?.reduce((s: number, m: any) => s + Number(m.amount), 0) || 0;
+
+  // Group milestones into sections
+  const { overdue, pending, paid } = useMemo(() => {
+    if (!milestones) return { overdue: [], pending: [], paid: [] };
+    const overdue: any[] = [];
+    const pending: any[] = [];
+    const paid: any[] = [];
+    for (const m of milestones) {
+      if (m.status === "PAID") {
+        paid.push(m);
+      } else if (isOverdue(m)) {
+        overdue.push(m);
+      } else {
+        pending.push(m);
+      }
+    }
+    return { overdue, pending, paid };
+  }, [milestones]);
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,6 +112,106 @@ export function ItemMilestones({ itemId, expectedCost, onMutate: onParentMutate,
 
   if (!milestones) return null;
 
+  // ── Render a single milestone card ──
+  const renderCard = (m: any) => {
+    const isPaid = m.status === "PAID";
+    const mOverdue = isOverdue(m);
+
+    // Determine card style
+    let borderColor = "border-s-amber-500"; // pending/due default
+    let bgColor = "bg-[var(--bg-elevated)]";
+    if (isPaid) {
+      borderColor = "border-s-[var(--success)]";
+      bgColor = "bg-[var(--success-soft)]";
+    } else if (mOverdue) {
+      borderColor = "border-s-[var(--alert)]";
+      bgColor = "bg-[var(--alert-soft)]";
+    }
+
+    if (editId === m.id) {
+      return (
+        <form key={m.id} onSubmit={handleEdit} className="rounded-lg border border-[var(--accent)]/30 bg-[var(--bg)] p-3 space-y-2">
+          <button type="button" onClick={() => setEditId(null)} className="flex w-full items-center justify-between rounded-lg px-1 py-0.5 -mx-1 transition-colors hover:bg-[var(--border-subtle)]">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent)]">{t("crud.edit")}</p>
+            <X size={12} className="text-[var(--fg-muted)]" />
+          </button>
+          <input type="text" placeholder={t("item.milestoneLabel")} value={editForm.label} onChange={(e) => setEditForm({ ...editForm, label: e.target.value })} required className={input} autoFocus />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <input type="number" placeholder={t("item.amount")} value={editForm.amount} onChange={(e) => setEditForm({ ...editForm, amount: e.target.value })} required className={input} />
+            <input type="date" value={editForm.dueDate} onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })} className={input} />
+            <select value={editForm.status} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })} className={`${input} appearance-none`}>
+              <option value="PENDING">{t("status.PENDING")}</option>
+              <option value="DUE">{t("status.DUE")}</option>
+              <option value="PAID">{t("status.PAID")}</option>
+            </select>
+          </div>
+          <div className="flex gap-2">
+            <label className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 py-2 text-xs text-[var(--fg-muted)] hover:border-[var(--accent)]">
+              <Upload size={12} />
+              {editFile ? editFile.name.slice(0, 15) : "PDF"}
+              <input type="file" accept=".pdf" onChange={(e) => setEditFile(e.target.files?.[0] || null)} className="hidden" />
+            </label>
+            <button type="submit" className="flex-1 rounded-lg bg-[var(--accent)] py-2 text-xs font-semibold text-white">{t("task.save")}</button>
+            <button type="button" onClick={() => setEditId(null)} className="rounded-lg bg-[var(--border-subtle)] px-4 py-2 text-xs text-[var(--fg-secondary)]">{t("task.cancel")}</button>
+          </div>
+        </form>
+      );
+    }
+
+    return (
+      <div key={m.id} className={`rounded-lg border-s-4 ${borderColor} ${bgColor} p-3 ${mOverdue ? "animate-[pulse-border_2s_ease-in-out_infinite]" : ""}`}>
+        <div className="flex items-start justify-between gap-2">
+          {/* Left: info */}
+          <div className="min-w-0 flex-1">
+            <p className={`text-sm font-bold ${mOverdue ? "text-[var(--alert)]" : "text-[var(--fg)]"}`}>{fmt(Number(m.amount))}</p>
+            <p className="text-xs text-[var(--fg-muted)] mt-0.5">
+              {m.label}
+              {m.percentage && <span className="ms-1">({m.percentage}%)</span>}
+            </p>
+            {isPaid && m.paidDate && (
+              <p className="text-xs text-[var(--success)] mt-0.5">{t("milestone.paid")} · {fmtDate(m.paidDate)}</p>
+            )}
+            {mOverdue && m.dueDate && (
+              <p className="text-xs text-[var(--alert)] mt-0.5">{t("milestone.overdueWas")} {fmtDate(m.dueDate)}</p>
+            )}
+            {!isPaid && !mOverdue && m.dueDate && (
+              <p className="text-xs text-[var(--fg-muted)] mt-0.5">{fmtDate(m.dueDate)}</p>
+            )}
+            {m.receiptUrl && (
+              <a href={m.receiptUrl} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex items-center gap-0.5 text-xs text-[var(--accent)] hover:underline">
+                <FileText size={10} />{m.receiptName || "PDF"}
+              </a>
+            )}
+          </div>
+
+          {/* Right: small icon buttons */}
+          <div className="flex shrink-0 items-center gap-0.5">
+            <button onClick={() => startEdit(m)} className="rounded-md p-1.5 text-[var(--fg-muted)] transition-all hover:bg-[var(--fg)]/5 hover:text-[var(--fg)]" title={t("crud.edit")}>
+              <Pencil size={12} />
+            </button>
+            <button onClick={() => deleteMilestone(m.id)} className="rounded-md p-1.5 text-[var(--fg-muted)] transition-all hover:bg-[var(--alert-soft)] hover:text-[var(--alert)]" title={t("crud.delete")}>
+              <Trash2 size={12} />
+            </button>
+          </div>
+        </div>
+
+        {/* Mark as Paid button — full width for unpaid milestones */}
+        {!isPaid && (
+          <button
+            onClick={() => markPaid(m.id)}
+            className={`mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg py-2.5 text-xs font-semibold text-white transition-all ${
+              mOverdue
+                ? "bg-[var(--alert)] hover:bg-[var(--alert)]/90 shadow-md shadow-[var(--alert)]/20"
+                : "bg-[var(--accent)] hover:bg-[var(--accent)]/90 shadow-md shadow-[var(--accent)]/20"
+            }`}
+          >
+            <CheckCircle2 size={14} /> {t("costs.markPaid")}
+          </button>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="mt-3 border-t border-[var(--border-subtle)] pt-3">
       {/* Summary bar */}
@@ -96,72 +225,45 @@ export function ItemMilestones({ itemId, expectedCost, onMutate: onParentMutate,
         </div>
       )}
 
-      {/* Payments list */}
-      {milestones.map((m: any) => (
-        <div key={m.id} className="mb-2">
-          {editId === m.id ? (
-            /* ── Inline edit ── */
-            <form onSubmit={handleEdit} className="rounded-lg border border-[var(--accent)]/30 bg-[var(--bg)] p-3 space-y-2">
-              <button type="button" onClick={() => setEditId(null)} className="flex w-full items-center justify-between rounded-lg px-1 py-0.5 -mx-1 transition-colors hover:bg-[var(--border-subtle)]">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent)]">{t("crud.edit")}</p>
-                <X size={12} className="text-[var(--fg-muted)]" />
-              </button>
-              <input type="text" placeholder={t("item.milestoneLabel")} value={editForm.label} onChange={(e) => setEditForm({ ...editForm, label: e.target.value })} required className={input} autoFocus />
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <input type="number" placeholder={t("item.amount")} value={editForm.amount} onChange={(e) => setEditForm({ ...editForm, amount: e.target.value })} required className={input} />
-                <input type="date" value={editForm.dueDate} onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })} className={input} />
-                <select value={editForm.status} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })} className={`${input} appearance-none`}>
-                  <option value="PENDING">{t("status.PENDING")}</option>
-                  <option value="DUE">{t("status.DUE")}</option>
-                  <option value="PAID">{t("status.PAID")}</option>
-                </select>
-              </div>
-              <div className="flex gap-2">
-                <label className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 py-2 text-xs text-[var(--fg-muted)] hover:border-[var(--accent)]">
-                  <Upload size={12} />
-                  {editFile ? editFile.name.slice(0, 15) : "PDF"}
-                  <input type="file" accept=".pdf" onChange={(e) => setEditFile(e.target.files?.[0] || null)} className="hidden" />
-                </label>
-                <button type="submit" className="flex-1 rounded-lg bg-[var(--accent)] py-2 text-xs font-semibold text-white">{t("task.save")}</button>
-                <button type="button" onClick={() => setEditId(null)} className="rounded-lg bg-[var(--border-subtle)] px-4 py-2 text-xs text-[var(--fg-secondary)]">{t("task.cancel")}</button>
-              </div>
-            </form>
-          ) : (
-            /* ── Normal display ── */
-            <div className="lift flex flex-wrap items-center justify-between gap-2 rounded-lg bg-[var(--bg)] p-3">
-              <div className="min-w-0 flex-1 basis-[140px]">
-                <div className="flex items-center gap-2">
-                  <p className="text-xs font-semibold text-[var(--fg)]">{m.label}</p>
-                  {m.percentage && <span className="text-[10px] text-[var(--fg-muted)]">({m.percentage}%)</span>}
-                </div>
-                <div className="mt-0.5 flex items-center gap-3 text-[11px] text-[var(--fg-muted)]">
-                  <span className="font-medium">{fmt(Number(m.amount))}</span>
-                  {m.dueDate && <span>{new Date(m.dueDate).toLocaleDateString(lang === "he" ? "he-IL" : "en-IL", { day: "numeric", month: "short" })}</span>}
-                  {m.receiptUrl && (
-                    <a href={m.receiptUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-0.5 text-[var(--accent)] hover:underline">
-                      <FileText size={10} />{m.receiptName || "PDF"}
-                    </a>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center gap-1">
-                <StatusBadge status={m.status} />
-                {m.status !== "PAID" && (
-                  <button onClick={() => markPaid(m.id)} className="rounded-lg bg-[var(--success-soft)] p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-[var(--success)] transition-all hover:bg-[var(--success)] hover:text-white" title={t("costs.markPaid")}>
-                    <CheckCircle2 size={14} />
-                  </button>
-                )}
-                <button onClick={() => editId === m.id ? setEditId(null) : startEdit(m)} className={`rounded-lg p-2 min-w-[44px] min-h-[44px] flex items-center justify-center transition-all ${editId === m.id ? "bg-[var(--accent)] text-white hover:bg-[var(--alert)]" : "bg-[var(--fg)]/5 text-[var(--fg)] hover:bg-[var(--accent)] hover:text-white"}`} title={editId === m.id ? t("task.cancel") : t("crud.edit")}>
-                  {editId === m.id ? <X size={12} /> : <Pencil size={12} />}
-                </button>
-                <button onClick={() => deleteMilestone(m.id)} className="rounded-lg bg-[var(--fg)]/5 p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-[var(--fg)] transition-all hover:bg-[var(--alert)] hover:text-white">
-                  <Trash2 size={12} />
-                </button>
-              </div>
+      {/* ── OVERDUE section ── */}
+      {overdue.length > 0 && (
+        <div className="mb-3">
+          <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-[var(--alert)]">{t("milestone.overdue")}</p>
+          <div className="space-y-2">
+            {overdue.map(renderCard)}
+          </div>
+        </div>
+      )}
+
+      {/* ── PENDING/DUE section ── */}
+      {pending.length > 0 && (
+        <div className="mb-3">
+          {(overdue.length > 0 || paid.length > 0) && (
+            <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-[var(--fg-muted)]">{t("milestone.pending")}</p>
+          )}
+          <div className="space-y-2">
+            {pending.map(renderCard)}
+          </div>
+        </div>
+      )}
+
+      {/* ── PAID section (collapsed by default) ── */}
+      {paid.length > 0 && (
+        <div className="mb-3">
+          <button
+            onClick={() => setShowPaid(!showPaid)}
+            className="mb-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-[var(--success)] hover:text-[var(--success)]/80 transition-colors"
+          >
+            <ChevronDown size={12} className={`transition-transform ${showPaid ? "rotate-180" : ""}`} />
+            {showPaid ? t("milestone.hidePaid") : t("milestone.showPaid")} ({paid.length})
+          </button>
+          {showPaid && (
+            <div className="space-y-2">
+              {paid.map(renderCard)}
             </div>
           )}
         </div>
-      ))}
+      )}
 
       {/* Add form */}
       {showAddForm ? (
