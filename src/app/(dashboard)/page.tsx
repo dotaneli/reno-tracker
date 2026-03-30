@@ -19,7 +19,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const { activeProject: project } = useProject();
   const { data: nodes } = useApi<any[]>(project ? `/api/nodes?projectId=${project.id}` : null);
-  const { data: issues } = useApi<any[]>(project ? "/api/issues" : null);
+  const { data: issues } = useApi<any[]>(project ? `/api/issues?projectId=${project.id}` : null);
   const fin = useFinancials(project?.id);
 
   const mutateAll = () => { mutate(`/api/nodes?projectId=${project?.id}`); mutate(`/api/projects/${project?.id}/milestones`); mutate(`/api/projects`); mutate(`/api/issues`); };
