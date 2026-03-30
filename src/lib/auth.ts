@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "./prisma";
+import { seedDemoProject } from "./seed-demo";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
@@ -46,6 +47,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       await prisma.pendingInvite.deleteMany({
         where: { email: user.email.toLowerCase() },
       });
+
+      // Seed demo project for every new user
+      await seedDemoProject(user.id!);
     },
   },
   pages: {

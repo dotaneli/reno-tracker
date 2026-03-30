@@ -5,6 +5,7 @@ import { json, handleError, parseBody } from "@/lib/api";
 interface ProjectUpdateBody {
   name?: string;
   totalBudget?: number;
+  isPublic?: boolean;
 }
 
 // GET /api/projects/:id
@@ -50,6 +51,7 @@ export async function PATCH(
       data: {
         ...(body.name !== undefined && { name: body.name.trim() }),
         ...(body.totalBudget !== undefined && { totalBudget: body.totalBudget }),
+        ...(body.isPublic !== undefined && { isPublic: body.isPublic }),
       },
     });
 
