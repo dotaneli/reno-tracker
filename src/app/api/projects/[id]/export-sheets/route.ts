@@ -242,7 +242,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
     const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}`;
     return Response.json({ url });
-  } catch (err) {
-    return handleError(err);
+  } catch (err: any) {
+    console.error("export-sheets error:", err);
+    const message = err?.message || "Export failed";
+    const isGoogleError = message.includes("insufficient") || message.includes("token") || message.includes("auth") || message.includes("credentials") || err?.code === 401 || err?.code === 403;
+    if (isGoogleError) {
+      return Response.json({ error: "google_auth_required", message: "Please sign out and sign in again to grant Google Sheets access." }, { status: 401 });
+    }
+    return Response.json({ error: "export_failed", message }, { status: 500 });
   }
 }
