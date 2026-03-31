@@ -32,7 +32,7 @@ const adminLink = { href: "/admin", label: "nav.admin" as TKey, icon: Shield };
 
 export function Nav() {
   const pathname = usePathname();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const { activeProject } = useProject();
   const [loading, setLoading] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
@@ -62,15 +62,45 @@ export function Nav() {
     setLoading(null);
   };
 
-  // ── WhatsApp: direct wa.me link (not navigator.share) ──
+  // ── WhatsApp: try native share first, fallback to wa.me ──
   const shareWhatsApp = async () => {
     if (!projectId) return;
     setLoading("whatsapp");
     try {
-      const res = await fetch(`/api/projects/${projectId}/export?format=whatsapp`);
+      const res = await fetch(`/api/projects/${projectId}/export?format=whatsapp&lang=${lang}`);
       const data = await res.json();
-      window.open(`https://wa.me/?text=${encodeURIComponent(data.text)}`, "_blank");
+      if (typeof navigator !== "undefined" && navigator.share) {
+        await navigator.share({ text: data.text });
+      } else {
+        window.open(`https://wa.me/?text=${encodeURIComponent(data.text)}`, "_blank");
+      }
       flash("whatsapp");
+    } catch {}
+    setLoading(null);
+  };
+
+  // ── Google Sheets: create in user's Drive ──
+  const exportToSheets = async () => {
+    if (!projectId) return;
+    setLoading("sheets");
+    try {
+      const res = await fetch(`/api/projects/${projectId}/export-sheets?lang=${lang}`, { method: "POST" });
+      const data = await res.json();
+      if (data.url) { window.open(data.url, "_blank"); flash("sheets"); }
+      else if (data.error === "google_auth_required") { alert("Please sign out and sign back in to grant Google Drive access."); }
+    } catch {}
+    setLoading(null);
+  };
+
+  // ── Google Docs: create in user's Drive ──
+  const exportToDocs = async () => {
+    if (!projectId) return;
+    setLoading("docs");
+    try {
+      const res = await fetch(`/api/projects/${projectId}/export-docs?lang=${lang}`, { method: "POST" });
+      const data = await res.json();
+      if (data.url) { window.open(data.url, "_blank"); flash("docs"); }
+      else if (data.error === "google_auth_required") { alert("Please sign out and sign back in to grant Google Drive access."); }
     } catch {}
     setLoading(null);
   };
@@ -80,7 +110,7 @@ export function Nav() {
     if (!projectId) return;
     setLoading("image");
     try {
-      const res = await fetch(`/api/projects/${projectId}/export?format=infographic`);
+      const res = await fetch(`/api/projects/${projectId}/export?format=infographic&lang=${lang}`);
       const svgText = await res.text();
       // Render SVG to canvas
       const canvas = document.createElement("canvas");
@@ -161,13 +191,13 @@ export function Nav() {
           {/* Mobile: horizontal scrollable row below nav */}
           <div className="flex md:hidden items-center gap-1.5 border-t border-[var(--border-subtle)] px-2 py-1.5 overflow-x-auto shrink-0">
             <span className="text-[9px] font-semibold uppercase tracking-wider text-[var(--fg-muted)] whitespace-nowrap">{t("export.title")}</span>
-            <button onClick={() => downloadFile("csv", "xlsx")} disabled={!!loading} className="flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-[11px] font-medium text-[var(--fg-secondary)] whitespace-nowrap hover:bg-[var(--warm-glow)]">
+            <button onClick={exportToSheets} disabled={!!loading} className="flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-[11px] font-medium text-[var(--fg-secondary)] whitespace-nowrap hover:bg-[var(--warm-glow)]">
               <FileSpreadsheet size={13} className="text-[#0F9D58]" />
-              {done === "csv" ? <Check size={11} className="text-[var(--success)]" /> : loading === "csv" ? "..." : t("export.sheets")}
+              {done === "sheets" ? <Check size={11} className="text-[var(--success)]" /> : loading === "sheets" ? "..." : t("export.sheets")}
             </button>
-            <button onClick={() => downloadFile("html", "html")} disabled={!!loading} className="flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-[11px] font-medium text-[var(--fg-secondary)] whitespace-nowrap hover:bg-[var(--warm-glow)]">
+            <button onClick={exportToDocs} disabled={!!loading} className="flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-[11px] font-medium text-[var(--fg-secondary)] whitespace-nowrap hover:bg-[var(--warm-glow)]">
               <FileText size={13} className="text-[#4285F4]" />
-              {done === "html" ? <Check size={11} className="text-[var(--success)]" /> : loading === "html" ? "..." : t("export.docs")}
+              {done === "docs" ? <Check size={11} className="text-[var(--success)]" /> : loading === "docs" ? "..." : t("export.docs")}
             </button>
             <button onClick={shareWhatsApp} disabled={!!loading} className="flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-[11px] font-medium text-[var(--fg-secondary)] whitespace-nowrap hover:bg-[var(--warm-glow)]">
               <MessageCircle size={13} className="text-[#25D366]" />
@@ -187,13 +217,13 @@ export function Nav() {
             <p className="px-2.5 mb-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-[var(--fg-muted)]">
               {t("export.title")}
             </p>
-            <button onClick={() => downloadFile("csv", "xlsx")} disabled={!!loading} className={shareBtn}>
+            <button onClick={exportToSheets} disabled={!!loading} className={shareBtn}>
               <FileSpreadsheet size={13} className="text-[#0F9D58]" />
-              {done === "csv" ? <><Check size={11} className="text-[var(--success)]" /></> : loading === "csv" ? "..." : t("export.sheets")}
+              {done === "sheets" ? <><Check size={11} className="text-[var(--success)]" /></> : loading === "sheets" ? "..." : t("export.sheets")}
             </button>
-            <button onClick={() => downloadFile("html", "html")} disabled={!!loading} className={shareBtn}>
+            <button onClick={exportToDocs} disabled={!!loading} className={shareBtn}>
               <FileText size={13} className="text-[#4285F4]" />
-              {done === "html" ? <><Check size={11} className="text-[var(--success)]" /></> : loading === "html" ? "..." : t("export.docs")}
+              {done === "docs" ? <><Check size={11} className="text-[var(--success)]" /></> : loading === "docs" ? "..." : t("export.docs")}
             </button>
             <button onClick={shareWhatsApp} disabled={!!loading} className={shareBtn}>
               <MessageCircle size={13} className="text-[#25D366]" />
