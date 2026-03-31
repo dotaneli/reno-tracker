@@ -84,7 +84,7 @@ export function Nav() {
     if (!projectId) return;
     setLoading("sheets");
     try {
-      const res = await fetch(`/api/projects/${projectId}/export-sheets?lang=${lang}`, { method: "POST" });
+      const res = await fetch(`/api/projects/${projectId}/export-sheets?lang=${lang}`);
       const data = await res.json();
       if (data.url) { window.open(data.url, "_blank"); flash("sheets"); }
       else if (data.error === "google_auth_required") { alert("Please sign out and sign back in to grant Google Drive access."); }
@@ -97,7 +97,7 @@ export function Nav() {
     if (!projectId) return;
     setLoading("docs");
     try {
-      const res = await fetch(`/api/projects/${projectId}/export-docs?lang=${lang}`, { method: "POST" });
+      const res = await fetch(`/api/projects/${projectId}/export-docs?lang=${lang}`);
       const data = await res.json();
       if (data.url) { window.open(data.url, "_blank"); flash("docs"); }
       else if (data.error === "google_auth_required") { alert("Please sign out and sign back in to grant Google Drive access."); }
