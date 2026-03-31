@@ -83,7 +83,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       requestBody: {
         properties: {
           title,
-          locale: lang === "he" ? "he" : "en",
+          locale: lang === "he" ? "iw_IL" : "en_US",
         },
         sheets: [
           { properties: { title: et("tasks", lang), sheetId: 0 } },
