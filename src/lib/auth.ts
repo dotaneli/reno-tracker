@@ -25,6 +25,30 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       session.user.id = user.id;
       return session;
     },
+    async signIn({ user, account }) {
+      // Update stored tokens on every sign-in (picks up new scopes + refreshes tokens)
+      if (account && user.id) {
+        try {
+          const existing = await prisma.account.findFirst({
+            where: { userId: user.id, provider: account.provider },
+          });
+          if (existing) {
+            await prisma.account.update({
+              where: { id: existing.id },
+              data: {
+                access_token: account.access_token,
+                refresh_token: account.refresh_token || existing.refresh_token,
+                expires_at: account.expires_at,
+                scope: account.scope,
+                id_token: account.id_token,
+                token_type: account.token_type,
+              },
+            });
+          }
+        } catch {}
+      }
+      return true;
+    },
   },
   events: {
     async createUser({ user }) {
