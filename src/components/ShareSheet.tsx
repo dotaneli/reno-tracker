@@ -145,7 +145,7 @@ export function ShareSheet({ open, onClose, anchorRef }: ShareSheetProps) {
     setLoading("gsheets");
     setError(null);
     try {
-      const res = await fetch(`/api/projects/${projectId}/export-sheets?lang=${lang}`, { method: "POST" });
+      const res = await fetch(`/api/projects/${projectId}/export-sheets?lang=${lang}`);
       const data = await res.json();
       if (!res.ok) {
         if (data.error === "google_auth_required") {
@@ -170,7 +170,7 @@ export function ShareSheet({ open, onClose, anchorRef }: ShareSheetProps) {
     setLoading("gdocs");
     setError(null);
     try {
-      const res = await fetch(`/api/projects/${projectId}/export-docs?lang=${lang}`, { method: "POST" });
+      const res = await fetch(`/api/projects/${projectId}/export-docs?lang=${lang}`);
       const data = await res.json();
       if (!res.ok) {
         if (data.error === "google_auth_required") {
