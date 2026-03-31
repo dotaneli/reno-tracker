@@ -20,7 +20,7 @@ export function ShareSheet({ open, onClose, anchorRef }: ShareSheetProps) {
   const [loading, setLoading] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const sheetRef = useRef<HTMLDivElement>(null);
+  // sheetRef removed — using desktopRef for click-outside
 
   const projectId = activeProject?.id;
 
@@ -29,21 +29,25 @@ export function ShareSheet({ open, onClose, anchorRef }: ShareSheetProps) {
     setTimeout(() => setDone(null), 2000);
   };
 
-  // Close on click outside
+  // Close on click outside (desktop only — mobile uses backdrop)
+  const desktopRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
+      // Only for desktop dropdown
+      if (window.innerWidth < 768) return;
       if (
-        sheetRef.current &&
-        !sheetRef.current.contains(e.target as Node) &&
+        desktopRef.current &&
+        !desktopRef.current.contains(e.target as Node) &&
         anchorRef?.current &&
         !anchorRef.current.contains(e.target as Node)
       ) {
         onClose();
       }
     };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    // Use click (not mousedown) so button onClick fires first
+    document.addEventListener("click", handler);
+    return () => document.removeEventListener("click", handler);
   }, [open, onClose, anchorRef]);
 
   // Close on Escape
@@ -146,20 +150,21 @@ export function ShareSheet({ open, onClose, anchorRef }: ShareSheetProps) {
     setError(null);
     try {
       const res = await fetch(`/api/projects/${projectId}/export-sheets?lang=${lang}`);
-      const data = await res.json();
       if (!res.ok) {
-        if (data.error === "google_auth_required") {
-          setError(t("export.googleAuthError"));
-        } else {
-          setError(data.message || data.error || "Export failed");
-        }
+        const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        const msg = data.error === "google_auth_required" ? t("export.googleAuthError") : (data.message || data.error || `Export failed (${res.status})`);
+        setError(msg);
+        alert(msg);
         setLoading(null);
         return;
       }
-      window.open(data.url, "_blank");
-      flash("gsheets");
+      const data = await res.json();
+      if (data.url) { window.open(data.url, "_blank"); flash("gsheets"); }
+      else { setError("No URL returned"); alert("Export failed — no URL returned"); }
     } catch (e: any) {
-      setError(e.message || "Export failed");
+      const msg = e.message || "Export failed";
+      setError(msg);
+      alert(msg);
     }
     setLoading(null);
   }, [projectId, lang, t]);
@@ -171,20 +176,21 @@ export function ShareSheet({ open, onClose, anchorRef }: ShareSheetProps) {
     setError(null);
     try {
       const res = await fetch(`/api/projects/${projectId}/export-docs?lang=${lang}`);
-      const data = await res.json();
       if (!res.ok) {
-        if (data.error === "google_auth_required") {
-          setError(t("export.googleAuthError"));
-        } else {
-          setError(data.message || data.error || "Export failed");
-        }
+        const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        const msg = data.error === "google_auth_required" ? t("export.googleAuthError") : (data.message || data.error || `Export failed (${res.status})`);
+        setError(msg);
+        alert(msg);
         setLoading(null);
         return;
       }
-      window.open(data.url, "_blank");
-      flash("gdocs");
+      const data = await res.json();
+      if (data.url) { window.open(data.url, "_blank"); flash("gdocs"); }
+      else { setError("No URL returned"); alert("Export failed — no URL returned"); }
     } catch (e: any) {
-      setError(e.message || "Export failed");
+      const msg = e.message || "Export failed";
+      setError(msg);
+      alert(msg);
     }
     setLoading(null);
   }, [projectId, lang, t]);
@@ -266,7 +272,7 @@ export function ShareSheet({ open, onClose, anchorRef }: ShareSheetProps) {
     <>
       {/* Desktop: dropdown */}
       <div
-        ref={sheetRef}
+        ref={desktopRef}
         className="hidden md:block absolute top-full mt-2 end-0 w-64 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-2 shadow-xl z-50"
       >
         <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-[var(--fg-muted)]">
@@ -279,7 +285,6 @@ export function ShareSheet({ open, onClose, anchorRef }: ShareSheetProps) {
       <div className="md:hidden fixed inset-0 z-50">
         <div className="absolute inset-0 bg-black/40" onClick={onClose} />
         <div
-          ref={sheetRef}
           className="absolute bottom-0 inset-x-0 rounded-t-2xl bg-[var(--bg-elevated)] p-4 pb-20 animate-[slideUp_0.2s_ease-out]"
         >
           <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-[var(--border)]" />
