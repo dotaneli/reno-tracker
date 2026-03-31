@@ -61,7 +61,7 @@ export function ShareSheet({ open, onClose, anchorRef }: ShareSheetProps) {
     if (!projectId) return;
     setLoading(format);
     try {
-      const res = await fetch(`/api/projects/${projectId}/export?format=${format}`);
+      const res = await fetch(`/api/projects/${projectId}/export?format=${format}&lang=${lang}`);
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -145,21 +145,21 @@ export function ShareSheet({ open, onClose, anchorRef }: ShareSheetProps) {
     setLoading("gsheets");
     setError(null);
     try {
-      const res = await fetch(`/api/projects/${projectId}/export-sheets?lang=${lang}`);
+      const res = await fetch(`/api/projects/${projectId}/export-sheets?lang=${lang}`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) {
         if (data.error === "google_auth_required") {
           setError(t("export.googleAuthError"));
         } else {
-          setError(data.message || "Export failed");
+          setError(data.message || data.error || "Export failed");
         }
         setLoading(null);
         return;
       }
       window.open(data.url, "_blank");
       flash("gsheets");
-    } catch {
-      setError("Export failed");
+    } catch (e: any) {
+      setError(e.message || "Export failed");
     }
     setLoading(null);
   }, [projectId, lang, t]);
@@ -170,21 +170,21 @@ export function ShareSheet({ open, onClose, anchorRef }: ShareSheetProps) {
     setLoading("gdocs");
     setError(null);
     try {
-      const res = await fetch(`/api/projects/${projectId}/export-docs?lang=${lang}`);
+      const res = await fetch(`/api/projects/${projectId}/export-docs?lang=${lang}`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) {
         if (data.error === "google_auth_required") {
           setError(t("export.googleAuthError"));
         } else {
-          setError(data.message || "Export failed");
+          setError(data.message || data.error || "Export failed");
         }
         setLoading(null);
         return;
       }
       window.open(data.url, "_blank");
       flash("gdocs");
-    } catch {
-      setError("Export failed");
+    } catch (e: any) {
+      setError(e.message || "Export failed");
     }
     setLoading(null);
   }, [projectId, lang, t]);
