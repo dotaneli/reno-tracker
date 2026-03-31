@@ -85,10 +85,15 @@ export function Nav() {
     setLoading("sheets");
     try {
       const res = await fetch(`/api/projects/${projectId}/export-sheets?lang=${lang}`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        alert(data.error === "google_auth_required" ? "Please sign out and sign back in to grant Google Drive access." : (data.message || data.error || `Export failed (${res.status})`));
+        setLoading(null); return;
+      }
       const data = await res.json();
       if (data.url) { window.open(data.url, "_blank"); flash("sheets"); }
-      else if (data.error === "google_auth_required") { alert("Please sign out and sign back in to grant Google Drive access."); }
-    } catch {}
+      else { alert("Export failed — no URL returned"); }
+    } catch (e: any) { alert(e.message || "Export failed"); }
     setLoading(null);
   };
 
@@ -98,10 +103,15 @@ export function Nav() {
     setLoading("docs");
     try {
       const res = await fetch(`/api/projects/${projectId}/export-docs?lang=${lang}`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        alert(data.error === "google_auth_required" ? "Please sign out and sign back in to grant Google Drive access." : (data.message || data.error || `Export failed (${res.status})`));
+        setLoading(null); return;
+      }
       const data = await res.json();
       if (data.url) { window.open(data.url, "_blank"); flash("docs"); }
-      else if (data.error === "google_auth_required") { alert("Please sign out and sign back in to grant Google Drive access."); }
-    } catch {}
+      else { alert("Export failed — no URL returned"); }
+    } catch (e: any) { alert(e.message || "Export failed"); }
     setLoading(null);
   };
 
