@@ -20,7 +20,7 @@ Renovation project management app. Next.js 16 + Prisma 7 + Neon PostgreSQL + Aut
 - **Auth:** `resolveAuth()` in `src/lib/dal.ts` — supports session cookies AND Bearer API keys
 - **Financial math:** `useFinancials` hook — single source of truth. `remainingToPay = totalCost - totalPaid`
 - **MCP Server:** `src/lib/mcp-server.ts` — 17 tools, served at `/api/agent/mcp`
-- **Logging:** `src/lib/logger.ts` — Upstash Redis structured logs. Query via `GET /api/admin/logs` or MCP `get_recent_logs`
+- **Logging:** `src/lib/logger.ts` — Upstash Redis structured logs. Query via `GET /api/logs` or MCP `get_recent_logs`
 - **Mutations:** always call `mutateAll()` or `onMutate()` after any data change to refresh SWR caches
 
 ## Running Tests

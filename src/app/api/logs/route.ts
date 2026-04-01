@@ -4,7 +4,7 @@ import { queryLogs, type LogLevel } from "@/lib/logger";
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "dotaneli@gmail.com";
 
-// GET /api/admin/logs?level=error&event=seed_failed&limit=50&since=2026-04-01
+// GET /api/logs?level=error&event=seed_failed&limit=50&since=2026-04-01
 export async function GET(request: Request) {
   try {
     const { email } = await requireUser();

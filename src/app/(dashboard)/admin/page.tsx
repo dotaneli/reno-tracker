@@ -28,7 +28,7 @@ export default function AdminPage() {
   const { data: me } = useApi<any>("/api/me");
   // Fetch admin data — the API itself enforces the email check server-side
   const { data, error, isLoading } = useApi<AdminData>(me ? "/api/admin" : null);
-  const logUrl = me ? `/api/admin/logs?limit=200${logFilter !== "all" ? `&level=${logFilter}` : ""}&_k=${logKey}` : null;
+  const logUrl = me ? `/api/logs?limit=200${logFilter !== "all" ? `&level=${logFilter}` : ""}&_k=${logKey}` : null;
   const { data: logs } = useApi<any[]>(logUrl);
 
   if (error) {
