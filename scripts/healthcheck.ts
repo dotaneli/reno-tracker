@@ -342,15 +342,15 @@ async function testAdminLogs() {
   section("ADMIN LOGS");
 
   // Unauthenticated should get 401
-  const { status: unauth } = await api("/api/admin/logs");
-  assert("Unauthenticated GET /api/admin/logs → 401", unauth === 401);
+  const { status: unauth } = await api("/api/logs");
+  assert("Unauthenticated GET /api/logs → 401", unauth === 401);
 
   // Non-admin user should get 403 (test users aren't the admin email)
-  const { status: forbidden } = await api("/api/admin/logs", { sessionToken: ctx.strangerToken });
-  assert("Non-admin GET /api/admin/logs → 403", forbidden === 403, `got ${forbidden}`);
+  const { status: forbidden } = await api("/api/logs", { sessionToken: ctx.strangerToken });
+  assert("Non-admin GET /api/logs → 403", forbidden === 403, `got ${forbidden}`);
 
   // Owner test user also isn't admin email — should also get 403
-  const { status: ownerForbidden } = await api("/api/admin/logs", { sessionToken: ctx.ownerToken });
+  const { status: ownerForbidden } = await api("/api/logs", { sessionToken: ctx.ownerToken });
   assert("Test owner (not admin email) → 403", ownerForbidden === 403, `got ${ownerForbidden}`);
 }
 
