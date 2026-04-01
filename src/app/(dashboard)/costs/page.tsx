@@ -93,7 +93,7 @@ function DonutChart({ segments, size: propSize = 200, strokeWidth: propStrokeWid
 
 export default function CostsPage() {
   const { t, lang } = useI18n();
-  const { activeProject: project } = useProject();
+  const { activeProject: project, loading } = useProject();
   const [calMonth, setCalMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
 
   const { data: allNodes } = useApi<any[]>(project ? `/api/nodes?projectId=${project.id}` : null);
@@ -163,7 +163,15 @@ export default function CostsPage() {
 
   const dayNames: TKey[] = ["costs.sun", "costs.mon", "costs.tue", "costs.wed", "costs.thu", "costs.fri", "costs.sat"];
 
-  if (!project) return <p className="py-16 text-center text-sm text-[var(--fg-muted)]">{t("general.loading")}</p>;
+  if (!project) {
+    if (loading) return <p className="py-16 text-center text-sm text-[var(--fg-muted)]">{t("general.loading")}</p>;
+    return (
+      <div className="flex h-64 flex-col items-center justify-center gap-3 text-[var(--fg-muted)]">
+        <p>{t("proj.noProjects")}</p>
+        <a href="/projects" className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white">{t("proj.create")}</a>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">

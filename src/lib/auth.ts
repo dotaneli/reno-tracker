@@ -52,8 +52,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   events: {
     async createUser({ user }) {
-      // When a new user signs in for the first time,
-      // convert any pending invites into real project memberships
+      // Seed demo project for every new user
+      await seedDemoProject(user.id!);
+
+      // Convert any pending invites into real project memberships
       if (!user.email) return;
 
       const pendingInvites = await prisma.pendingInvite.findMany({
@@ -78,9 +80,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       await prisma.pendingInvite.deleteMany({
         where: { email: user.email.toLowerCase() },
       });
-
-      // Seed demo project for every new user
-      await seedDemoProject(user.id!);
     },
   },
   pages: {

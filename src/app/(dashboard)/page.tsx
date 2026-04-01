@@ -17,7 +17,7 @@ import { AlertTriangle, Wallet, Layers, Package, TrendingUp, CalendarDays, Arrow
 export default function DashboardPage() {
   const { t, lang } = useI18n();
   const router = useRouter();
-  const { activeProject: project } = useProject();
+  const { activeProject: project, loading } = useProject();
   const { data: nodes } = useApi<any[]>(project ? `/api/nodes?projectId=${project.id}` : null);
   const { data: issues } = useApi<any[]>(project ? `/api/issues?projectId=${project.id}` : null);
   const fin = useFinancials(project?.id);
@@ -34,7 +34,15 @@ export default function DashboardPage() {
 
   const fmt = (n: number) => new Intl.NumberFormat(lang === "he" ? "he-IL" : "en-IL", { style: "currency", currency: "ILS", maximumFractionDigits: 0 }).format(n);
 
-  if (!project) return <div className="flex h-64 items-center justify-center text-[var(--fg-muted)]">{t("general.loading")}</div>;
+  if (!project) {
+    if (loading) return <div className="flex h-64 items-center justify-center text-[var(--fg-muted)]">{t("general.loading")}</div>;
+    return (
+      <div className="flex h-64 flex-col items-center justify-center gap-3 text-[var(--fg-muted)]">
+        <p>{t("proj.noProjects")}</p>
+        <a href="/projects" className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white">{t("proj.create")}</a>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">

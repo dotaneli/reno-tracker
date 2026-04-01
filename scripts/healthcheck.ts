@@ -279,6 +279,32 @@ async function testSnapshotRollback() {
   assert("V2 still exists", snaps.some((s: any) => s.label === "V2"));
 }
 
+async function testNewUserNoProjects() {
+  section("NEW USER — NO PROJECTS");
+  // Simulate a brand-new user who has zero projects (seed failed or wasn't invited)
+  const now = new Date(), exp = new Date(Date.now() + 86400000);
+  const u = await prisma.user.create({ data: { email: `hc-newuser-${crypto.randomUUID().slice(0, 8)}@test.local`, name: "HC New User", emailVerified: now } });
+  const tok = crypto.randomUUID();
+  await prisma.session.create({ data: { sessionToken: tok, userId: u.id, expires: exp } });
+
+  // GET /api/projects should return empty array, NOT error
+  const { status, body } = await api("/api/projects", { sessionToken: tok });
+  assert("New user GET /api/projects → 200", status === 200);
+  assert("New user has 0 projects", Array.isArray(body) && body.length === 0);
+
+  // GET /api/me should work
+  const { status: meStatus } = await api("/api/me", { sessionToken: tok });
+  assert("New user GET /api/me → 200", meStatus === 200);
+
+  // Dashboard page should not 500
+  const dashRes = await fetch(`${BASE}/`, { headers: { Cookie: `${ck()}=${tok}` }, redirect: "manual" });
+  assert("Dashboard page loads (not 500)", dashRes.status < 500);
+
+  // Cleanup
+  await prisma.session.deleteMany({ where: { userId: u.id } });
+  await prisma.user.delete({ where: { id: u.id } });
+}
+
 async function testEdgeCases() {
   section("EDGE CASES");
   const tok = ctx.ownerToken;
@@ -312,6 +338,7 @@ async function main() {
     await testTenantIsolation();
     await testRolePermissions();
     await testSnapshotRollback();
+    await testNewUserNoProjects();
     await testEdgeCases();
   } catch (err) { console.error("\n💥 Fatal:", err); }
   finally { await teardown(); await prisma.$disconnect(); }
