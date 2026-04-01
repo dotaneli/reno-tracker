@@ -7,6 +7,7 @@ import { prisma } from "./prisma";
 import { resolveAuth, requireProjectAccess, getUserProjectIds, AuthError, type AuthResult } from "./dal";
 import { logAction } from "./actionlog";
 import { uploadBase64File } from "./file-upload";
+import { queryLogs, type LogLevel } from "./logger";
 import type { ApiKeyScope } from "../generated/prisma/client";
 
 // ── Tool definitions ──
@@ -211,14 +212,34 @@ export const TOOLS: McpTool[] = [
       required: ["nodeId", "fileName", "fileBase64"],
     },
   },
+  {
+    name: "get_recent_logs",
+    description: "Query recent system logs (errors, auth events, seed results). Admin-only. Use to investigate issues and debug problems.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        level: { type: "string", enum: ["error", "warn", "info"], description: "Filter by log level" },
+        event: { type: "string", description: "Filter by event name (e.g., seed_failed, auth_denied, unhandled_error)" },
+        limit: { type: "number", description: "Max entries to return (default 100, max 500)" },
+        since: { type: "string", description: "ISO date string — only return logs after this time" },
+      },
+      required: [],
+    },
+  },
 ];
 
 // ── Scope checking ──
 
 const READ_TOOLS = new Set(["list_projects", "get_project_tree", "get_financial_summary", "list_issues", "list_vendors", "list_categories"]);
 
+const ADMIN_TOOLS = new Set(["get_recent_logs"]);
+
 function requireScope(auth: AuthResult, toolName: string) {
   if (auth.type !== "apiKey") return; // session users have full access
+  if (ADMIN_TOOLS.has(toolName)) {
+    if (auth.scope !== "ADMIN") throw new AuthError("This tool requires an ADMIN API key.", 403);
+    return;
+  }
   if (READ_TOOLS.has(toolName)) return; // read tools allowed for all scopes
   if (auth.scope === "READ_ONLY") {
     throw new AuthError("This API key is read-only. Write operations require a READ_WRITE or ADMIN key.", 403);
@@ -535,6 +556,16 @@ export async function executeTool(toolName: string, args: Record<string, any>, a
       const result = await uploadBase64File(fileName, fileBase64, `receipts/${nodeId}`);
       const receipt = await prisma.receipt.create({ data: { fileUrl: result.url, fileName: result.name, fileSize: result.size, nodeId } });
       return receipt;
+    }
+
+    case "get_recent_logs": {
+      const logs = await queryLogs({
+        level: args.level as LogLevel | undefined,
+        event: args.event,
+        limit: args.limit ? Math.min(Number(args.limit), 500) : 100,
+        since: args.since,
+      });
+      return logs;
     }
 
     default:

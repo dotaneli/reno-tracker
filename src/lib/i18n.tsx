@@ -37,6 +37,11 @@ const dict = {
   "admin.projects": { en: "projects", he: "פרויקטים" },
   "admin.members": { en: "members", he: "חברים" },
   "admin.nodes": { en: "nodes", he: "צמתים" },
+  "admin.logs": { en: "System Logs", he: "לוגים" },
+  "admin.logsEmpty": { en: "No logs found", he: "לא נמצאו לוגים" },
+  "admin.logsFilter": { en: "Filter", he: "סינון" },
+  "admin.logsAll": { en: "All", he: "הכל" },
+  "admin.logsRefresh": { en: "Refresh", he: "רענן" },
 
   // ── Login ──
   "login.title": { en: "Reno Tracker", he: "מעקב שיפוצים" },

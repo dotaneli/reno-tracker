@@ -1,10 +1,11 @@
 "use client";
 
+import { useState, useCallback } from "react";
 import { useI18n } from "@/lib/i18n";
 import { useApi } from "@/hooks/useApi";
 import { Card, StatCard } from "@/components/Card";
 import { Expandable } from "@/components/Expandable";
-import { Shield, Users, FolderKanban, Layers, Crown, Pencil, Eye } from "lucide-react";
+import { Shield, Users, FolderKanban, Layers, Crown, Pencil, Eye, ScrollText, RefreshCw, AlertTriangle, AlertCircle, Info } from "lucide-react";
 
 const roleIcons: Record<string, any> = { OWNER: Crown, ADMIN: Shield, EDITOR: Pencil, VIEWER: Eye };
 
@@ -17,11 +18,18 @@ interface AdminData {
   }[];
 }
 
+const levelIcon: Record<string, any> = { error: AlertTriangle, warn: AlertCircle, info: Info };
+const levelColor: Record<string, string> = { error: "text-[var(--alert)]", warn: "text-[var(--accent)]", info: "text-[var(--fg-muted)]" };
+
 export default function AdminPage() {
   const { t } = useI18n();
+  const [logFilter, setLogFilter] = useState<string>("all");
+  const [logKey, setLogKey] = useState(0);
   const { data: me } = useApi<any>("/api/me");
   // Fetch admin data — the API itself enforces the email check server-side
   const { data, error, isLoading } = useApi<AdminData>(me ? "/api/admin" : null);
+  const logUrl = me ? `/api/admin/logs?limit=200${logFilter !== "all" ? `&level=${logFilter}` : ""}&_k=${logKey}` : null;
+  const { data: logs } = useApi<any[]>(logUrl);
 
   if (error) {
     return (
@@ -186,6 +194,66 @@ export default function AdminPage() {
                 </div>
               </div>
             ))}
+          </div>
+        </Expandable>
+      </Card>
+
+      {/* System Logs */}
+      <Card>
+        <Expandable
+          defaultOpen
+          trigger={
+            <div className="flex items-center gap-2.5">
+              <div className="rounded-lg bg-[var(--accent-soft)] p-2">
+                <ScrollText size={16} className="text-[var(--accent)]" />
+              </div>
+              <p className="text-sm font-semibold text-[var(--fg)]">{t("admin.logs")}</p>
+              {logs && <span className="rounded-full bg-[var(--border-subtle)] px-2 py-0.5 text-[10px] font-bold text-[var(--fg-muted)]">{logs.length}</span>}
+            </div>
+          }
+        >
+          <div className="mt-2 space-y-2">
+            {/* Filters + refresh */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {["all", "error", "warn", "info"].map((lvl) => (
+                <button
+                  key={lvl}
+                  onClick={() => setLogFilter(lvl)}
+                  className={`rounded-lg px-2.5 py-1 text-[10px] font-semibold transition-colors ${logFilter === lvl ? "bg-[var(--accent)] text-white" : "bg-[var(--border-subtle)] text-[var(--fg-muted)] hover:bg-[var(--border)]"}`}
+                >
+                  {lvl === "all" ? t("admin.logsAll") : lvl.toUpperCase()}
+                </button>
+              ))}
+              <button onClick={() => setLogKey((k) => k + 1)} className="ms-auto rounded-lg bg-[var(--border-subtle)] p-1.5 text-[var(--fg-muted)] hover:bg-[var(--border)]">
+                <RefreshCw size={12} />
+              </button>
+            </div>
+
+            {/* Log entries */}
+            <div className="max-h-96 overflow-y-auto space-y-1">
+              {!logs || logs.length === 0 ? (
+                <p className="py-4 text-center text-xs text-[var(--fg-muted)]">{t("admin.logsEmpty")}</p>
+              ) : (
+                logs.map((entry: any, i: number) => {
+                  const LevelIcon = levelIcon[entry.level] || Info;
+                  const color = levelColor[entry.level] || "";
+                  return (
+                    <div key={i} className="flex items-start gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg)] p-2.5">
+                      <LevelIcon size={14} className={`shrink-0 mt-0.5 ${color}`} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="rounded bg-[var(--border-subtle)] px-1.5 py-0.5 text-[10px] font-mono font-semibold text-[var(--fg-secondary)]">{entry.event}</span>
+                          <span className="text-[10px] text-[var(--fg-muted)]">{new Date(entry.ts).toLocaleString()}</span>
+                        </div>
+                        {entry.message && <p className="mt-0.5 text-xs text-[var(--fg)]">{entry.message}</p>}
+                        {entry.error && <p className="mt-0.5 text-xs text-[var(--alert)]">{entry.error}</p>}
+                        {entry.userId && <p className="text-[10px] text-[var(--fg-muted)]">user: {entry.userId}</p>}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
           </div>
         </Expandable>
       </Card>

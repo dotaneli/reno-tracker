@@ -3,6 +3,7 @@ import Google from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "./prisma";
 import { seedDemoProject } from "./seed-demo";
+import { log } from "./logger";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
@@ -26,6 +27,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return session;
     },
     async signIn({ user, account }) {
+      log("info", "sign_in", { userId: user.id, message: user.email || undefined });
       // Update stored tokens on every sign-in (picks up new scopes + refreshes tokens)
       if (account && user.id) {
         try {
@@ -52,6 +54,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   events: {
     async createUser({ user }) {
+      log("info", "user_created", { userId: user.id!, message: user.email || undefined });
       // Seed demo project for every new user
       await seedDemoProject(user.id!);
 

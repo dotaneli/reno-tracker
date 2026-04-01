@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { log } from "./lib/logger";
 
 export default async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -38,6 +39,7 @@ export default async function proxy(req: NextRequest) {
       : null;
 
     if (!sessionToken && !bearerToken) {
+      log("warn", "auth_denied", { message: pathname });
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
