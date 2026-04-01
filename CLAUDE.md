@@ -4,8 +4,9 @@
 
 Renovation project management app. Next.js 16 + Prisma 7 + Neon PostgreSQL + Auth.js v5.
 
-**Live:** https://reno-tracker-rho.vercel.app
-**Repo:** https://github.com/dotaneli/reno-tracker
+**Live v1:** https://reno-tracker-rho.vercel.app (`NEXT_PUBLIC_UI_VERSION=v1`)
+**Live v2:** https://reno-tracker-v2.vercel.app (`NEXT_PUBLIC_UI_VERSION=v2`)
+**Repo:** https://github.com/dotaneli/reno-tracker (single `master` branch)
 
 ## Critical Rules
 
@@ -19,6 +20,7 @@ Renovation project management app. Next.js 16 + Prisma 7 + Neon PostgreSQL + Aut
 
 - **Auth:** `resolveAuth()` in `src/lib/dal.ts` — supports session cookies AND Bearer API keys
 - **Financial math:** `useFinancials` hook — single source of truth. `remainingToPay = totalCost - totalPaid`
+- **UI versioning:** `NEXT_PUBLIC_UI_VERSION` env var (`v1`/`v2`). Divergent components have `.v1.tsx`/`.v2.tsx` variants with selector files using `next/dynamic`
 - **MCP Server:** `src/lib/mcp-server.ts` — 17 tools, served at `/api/agent/mcp`
 - **Logging:** `src/lib/logger.ts` — Upstash Redis structured logs. Query via `GET /api/logs` or MCP `get_recent_logs`
 - **Mutations:** always call `mutateAll()` or `onMutate()` after any data change to refresh SWR caches
