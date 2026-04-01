@@ -19,13 +19,14 @@ Renovation project management app. Next.js 16 + Prisma 7 + Neon PostgreSQL + Aut
 
 - **Auth:** `resolveAuth()` in `src/lib/dal.ts` — supports session cookies AND Bearer API keys
 - **Financial math:** `useFinancials` hook — single source of truth. `remainingToPay = totalCost - totalPaid`
-- **MCP Server:** `src/lib/mcp-server.ts` — 16 tools, served at `/api/agent/mcp`
+- **MCP Server:** `src/lib/mcp-server.ts` — 17 tools, served at `/api/agent/mcp`
+- **Logging:** `src/lib/logger.ts` — Upstash Redis structured logs. Query via `GET /api/admin/logs` or MCP `get_recent_logs`
 - **Mutations:** always call `mutateAll()` or `onMutate()` after any data change to refresh SWR caches
 
 ## Running Tests
 
 ```bash
-npm run healthcheck                    # 52 tests against production
+npm run healthcheck                    # 59 tests against production
 npx tsx scripts/mcp-integration-test.ts # 100 tests against production
 ```
 
@@ -38,5 +39,10 @@ npx tsx scripts/mcp-integration-test.ts # 100 tests against production
 | `src/hooks/useFinancials.ts` | Financial calculations (shared across all pages) |
 | `src/lib/mcp-server.ts` | MCP tool definitions and handlers |
 | `src/proxy.ts` | Middleware (auth check, CORS, rate limiting) |
+| `src/lib/logger.ts` | Structured logging (Upstash Redis Streams) |
 | `src/lib/i18n.tsx` | Translation dictionary (180+ keys) |
 | `prisma/schema.prisma` | Database schema (21 models) |
+
+## Session Continuity
+
+**Always persist your work to memory before ending a session.** Save decisions, architecture changes, and open issues to `~/.claude/projects/-home-dotaneli-reno-tracker/memory/`. Keep memory files concise — no fluff, no code snippets, just decisions and context. Read MEMORY.md at session start to onboard.
