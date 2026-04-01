@@ -4,6 +4,7 @@
  * Creates a complete showcase project with tasks, payments, vendors, etc.
  */
 import { prisma } from "./prisma";
+import { log } from "./logger";
 
 export async function seedDemoProject(userId: string) {
   try {
@@ -229,8 +230,8 @@ export async function seedDemoProject(userId: string) {
     await prisma.issue.create({ data: { title: "Electrical outlet placement wrong in office", description: "Two outlets installed 10cm too low. Fixed by ElectroPro.", nodeId: nRewire.id, status: "RESOLVED" } });
     await prisma.issue.create({ data: { title: "Delay on interior doors delivery", description: "Vendor reports 3-week delay due to supply chain.", nodeId: nIntDoors.id, status: "OPEN" } });
 
-    console.log(`✅ Demo project seeded for user ${userId}: ${pid}`);
+    log("info", "seed_success", { userId, projectId: pid });
   } catch (err) {
-    console.error("Demo project seed failed (non-fatal):", err);
+    log("error", "seed_failed", { userId, error: err instanceof Error ? err.message : String(err) });
   }
 }

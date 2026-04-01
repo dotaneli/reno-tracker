@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "../generated/prisma/client";
 import { AuthError } from "./dal";
+import { log } from "./logger";
 
 export function json<T>(data: T, status = 200) { return NextResponse.json(data, { status }); }
 export function errorResponse(message: string, status: number) { return NextResponse.json({ error: message }, { status }); }
@@ -13,7 +14,7 @@ export function handleError(err: unknown) {
     if (err.code === "P2002") return errorResponse("Unique constraint violation", 409);
   }
   if (err instanceof SyntaxError) return errorResponse("Invalid JSON body", 400);
-  console.error("Unhandled error:", err);
+  log("error", "unhandled_error", { error: err instanceof Error ? err.message : String(err), meta: { stack: err instanceof Error ? err.stack : undefined } });
   return errorResponse("Internal server error", 500);
 }
 
