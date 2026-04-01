@@ -101,7 +101,7 @@ const selCls = "w-full appearance-none rounded-xl border border-[var(--border)] 
 
 export default function HomePage() {
   const { t, lang } = useI18n();
-  const { activeProject: project } = useProject();
+  const { activeProject: project, loading } = useProject();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [calMonth, setCalMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
 
@@ -109,7 +109,6 @@ export default function HomePage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ title: "", nodeId: "", description: "", status: "OPEN" });
   const [error, setError] = useState("");
-
   const { data: nodes } = useApi<any[]>(project ? `/api/nodes?projectId=${project.id}` : null);
   const { data: issues } = useApi<any[]>(project ? `/api/issues?projectId=${project.id}` : null);
   const fin = useFinancials(project?.id);
@@ -231,7 +230,15 @@ export default function HomePage() {
     return { completed, inProgress, pending };
   }, [leafNodes]);
 
-  if (!project) return <div className="flex h-64 items-center justify-center text-[var(--fg-muted)]">{t("general.loading")}</div>;
+  if (!project) {
+    if (loading) return <div className="flex h-64 items-center justify-center text-[var(--fg-muted)]">{t("general.loading")}</div>;
+    return (
+      <div className="flex h-64 flex-col items-center justify-center gap-3 text-[var(--fg-muted)]">
+        <p>{t("proj.noProjects")}</p>
+        <a href="/projects" className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white">{t("proj.create")}</a>
+      </div>
+    );
+  }
 
   // ── Tab definitions ──
   const tabs: { id: Tab; label: string; icon: React.ReactNode; badge?: number }[] = [
