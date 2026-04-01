@@ -305,6 +305,39 @@ async function testNewUserNoProjects() {
   await prisma.user.delete({ where: { id: u.id } });
 }
 
+async function testNewUserSeeding() {
+  section("NEW USER — DEMO PROJECT SEEDING");
+  // Simulate the createUser auth event: create user then call seedDemoProject
+  const { seedDemoProject } = await import("../src/lib/seed-demo");
+  const now = new Date(), exp = new Date(Date.now() + 86400000);
+  const u = await prisma.user.create({ data: { email: `hc-seed-${crypto.randomUUID().slice(0, 8)}@test.local`, name: "HC Seed Test", emailVerified: now } });
+  const tok = crypto.randomUUID();
+  await prisma.session.create({ data: { sessionToken: tok, userId: u.id, expires: exp } });
+
+  // Run seedDemoProject (same as createUser event does)
+  await seedDemoProject(u.id);
+
+  // Verify user now has the demo project
+  const { status, body } = await api("/api/projects", { sessionToken: tok });
+  assert("Seeded user GET /api/projects → 200", status === 200);
+  assert("Seeded user has 1 project", Array.isArray(body) && body.length === 1);
+  assert("Project is Dream House Renovation", body[0]?.name === "Dream House Renovation");
+
+  // Verify project has nodes
+  const { body: nodes } = await api(`/api/nodes?projectId=${body[0]?.id}`, { sessionToken: tok });
+  assert("Demo project has 50+ nodes", Array.isArray(nodes) && nodes.length >= 50);
+
+  // Verify idempotent — running again should not create a duplicate
+  await seedDemoProject(u.id);
+  const { body: body2 } = await api("/api/projects", { sessionToken: tok });
+  assert("Seed is idempotent (still 1 project)", Array.isArray(body2) && body2.length === 1);
+
+  // Cleanup
+  if (body[0]?.id) await prisma.project.delete({ where: { id: body[0].id } }).catch(() => {});
+  await prisma.session.deleteMany({ where: { userId: u.id } });
+  await prisma.user.delete({ where: { id: u.id } });
+}
+
 async function testAdminLogs() {
   section("ADMIN LOGS");
 
@@ -355,6 +388,7 @@ async function main() {
     await testRolePermissions();
     await testSnapshotRollback();
     await testNewUserNoProjects();
+    await testNewUserSeeding();
     await testAdminLogs();
     await testEdgeCases();
   } catch (err) { console.error("\n💥 Fatal:", err); }
