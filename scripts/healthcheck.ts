@@ -314,11 +314,11 @@ async function testAdminLogs() {
 
   // Non-admin user should get 403 (test users aren't the admin email)
   const { status: forbidden } = await api("/api/admin/logs", { sessionToken: ctx.strangerToken });
-  assert("Non-admin GET /api/admin/logs → 403", forbidden === 403);
+  assert("Non-admin GET /api/admin/logs → 403", forbidden === 403, `got ${forbidden}`);
 
   // Owner test user also isn't admin email — should also get 403
   const { status: ownerForbidden } = await api("/api/admin/logs", { sessionToken: ctx.ownerToken });
-  assert("Test owner (not admin email) → 403", ownerForbidden === 403);
+  assert("Test owner (not admin email) → 403", ownerForbidden === 403, `got ${ownerForbidden}`);
 }
 
 async function testEdgeCases() {
