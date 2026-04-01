@@ -7,6 +7,7 @@
  * Run: npx tsx scripts/mcp-integration-test.ts
  */
 
+import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { createHash, randomBytes } from "crypto";
@@ -133,7 +134,7 @@ async function testMcpProtocol() {
   assert(init.result?.capabilities?.tools !== undefined, "initialize returns tools capability");
 
   const tools = await mcpCall("tools/list");
-  assert(tools.result?.tools?.length === 16, `tools/list returns 16 tools (got ${tools.result?.tools?.length})`);
+  assert(tools.result?.tools?.length === 17, `tools/list returns 17 tools (got ${tools.result?.tools?.length})`);
 
   const ping = await mcpCall("ping");
   assert(ping.result !== undefined, "ping responds");
