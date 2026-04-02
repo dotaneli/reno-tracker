@@ -23,9 +23,9 @@ const input =
   "w-full rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] px-4 py-3 text-sm text-[var(--fg)] placeholder-[var(--fg-muted)]/60 outline-none transition-all focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/10";
 
 const PLATFORMS = [
-  { id: "claude", name: "Claude", icon: Bot, color: "#b8956a", desc: "Anthropic — Easiest setup", tag: "Recommended" },
-  { id: "chatgpt", name: "ChatGPT", icon: MessageSquare, color: "#10a37f", desc: "OpenAI — Requires Plus ($20/mo)", tag: "" },
-  { id: "gemini", name: "Gemini CLI", icon: Sparkles, color: "#4285f4", desc: "Google — Requires terminal", tag: "" },
+  { id: "claude", name: "Claude", icon: Bot, color: "#b8956a", desc: "Anthropic — Web + CLI, read & write", tag: "Recommended" },
+  { id: "chatgpt", name: "ChatGPT", icon: MessageSquare, color: "#10a37f", desc: "OpenAI — Web, read & write", tag: "" },
+  { id: "gemini", name: "Gemini", icon: Sparkles, color: "#4285f4", desc: "Google — CLI only, read-only", tag: "" },
 ] as const;
 
 type SetupData = {

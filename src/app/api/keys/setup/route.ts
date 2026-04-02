@@ -56,8 +56,8 @@ function getSetupPayload(platform: string, keyPlaintext: string, apiUrl: string)
     case "gemini":
       return {
         platform: "Gemini CLI",
-        requirement: "Free — requires Node.js and a terminal",
-        note: "The Gemini web app (gemini.google.com) cannot connect to external APIs. The Gemini CLI is the recommended way — it's free and supports MCP natively.",
+        requirement: "Free — requires Node.js and a terminal. Read-only access.",
+        note: "Gemini web (gemini.google.com) cannot connect to external APIs. The Gemini CLI supports MCP but with read-only access — it can view your projects, tasks, and costs but cannot create or update data. For full read & write access, use Claude or ChatGPT.",
         steps: [
           {
             step: 1,
@@ -172,12 +172,13 @@ export async function POST(request: Request) {
     const keyHash = createHash("sha256").update(keyPlaintext).digest("hex");
     const keyPrefix = keyPlaintext.slice(0, 7) + "...";
 
+    const scope = platform === "gemini" ? "READ_ONLY" : "READ_WRITE";
     await prisma.apiKey.create({
       data: {
         name: `${platform.charAt(0).toUpperCase() + platform.slice(1)} Connection`,
         keyHash,
         keyPrefix,
-        scope: "READ_WRITE",
+        scope: scope as any,
         userId,
       },
     });
