@@ -98,28 +98,22 @@ function getSetupPayload(platform: string, keyPlaintext: string, apiUrl: string)
     case "claude":
       return {
         platform: "Claude",
-        requirement: "Claude Pro, Max, Team, or Enterprise plan for custom connectors on claude.ai. Claude Code works on all plans.",
+        requirement: "Free plan: 1 connector. Pro/Max/Team: unlimited. Claude Code works on all plans.",
         steps: [
           {
             step: 1,
-            title: "Option A: Claude Code (easiest — one command)",
+            title: "Option A: Claude.ai (web) — sign in with Google",
+            description: "Go to claude.ai → Profile → Settings → Connectors → \"Add custom connector\". Paste the MCP URL. You'll sign in with Google automatically — no API key needed.",
+            copyable: mcpUrl,
+          },
+          {
+            step: 2,
+            title: "Option B: Claude Code (one command)",
             description: "If you have Claude Code installed, paste this in your terminal:",
             copyable: `claude mcp add --transport http reno-tracker ${mcpUrl} --header "Authorization: Bearer ${keyPlaintext}"`,
           },
           {
-            step: 2,
-            title: "Option B: Claude.ai (web)",
-            description: "Go to claude.ai → Profile → Settings → Connectors → \"Add custom connector\". Paste the MCP URL:",
-            copyable: mcpUrl,
-          },
-          {
             step: 3,
-            title: "Add authentication",
-            description: "When prompted for authentication, add the Authorization header with your Bearer token:",
-            copyable: `Bearer ${keyPlaintext}`,
-          },
-          {
-            step: 4,
             title: "Option C: Claude Desktop app",
             description: "Edit your Claude Desktop config file and add this MCP server:",
             copyable: JSON.stringify({
@@ -132,7 +126,7 @@ function getSetupPayload(platform: string, keyPlaintext: string, apiUrl: string)
             }, null, 2),
           },
           {
-            step: 5,
+            step: 4,
             title: "Test it",
             description: "Start a new conversation and try: \"Show me my renovation projects\"",
           },

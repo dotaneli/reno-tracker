@@ -7,6 +7,7 @@ export default async function proxy(req: NextRequest) {
   // Public routes — no auth needed
   if (
     pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/api/oauth") ||
     pathname.startsWith("/api/translate") ||
     pathname.startsWith("/api/openapi") ||
     pathname.startsWith("/_next") ||

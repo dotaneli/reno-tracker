@@ -43,12 +43,18 @@ async function setup() {
     ctx[`${key}Id`] = u.id; ctx[`${key}Token`] = crypto.randomUUID();
     await prisma.session.create({ data: { sessionToken: ctx[`${key}Token`], userId: u.id, expires: exp } });
   }
-  console.log("  Created 3 synthetic test users");
+  // Create an API key for the owner (for MCP/OAuth tests)
+  const apiKeyPlain = "rk_" + crypto.randomBytes(20).toString("hex");
+  const apiKeyHash = crypto.createHash("sha256").update(apiKeyPlain).digest("hex");
+  await prisma.apiKey.create({ data: { name: "HC Test Key", keyHash: apiKeyHash, keyPrefix: apiKeyPlain.slice(0, 7) + "...", scope: "READ_WRITE", userId: ctx.ownerId } });
+  ctx.ownerApiKey = apiKeyPlain;
+  console.log("  Created 3 synthetic test users + API key");
 }
 
 async function teardown() {
   section("TEARDOWN");
   if (ctx.projectId) await prisma.project.delete({ where: { id: ctx.projectId } }).catch(() => {});
+  await prisma.apiKey.deleteMany({ where: { userId: { in: [ctx.ownerId, ctx.strangerId, ctx.viewerId] } } });
   await prisma.session.deleteMany({ where: { userId: { in: [ctx.ownerId, ctx.strangerId, ctx.viewerId] } } });
   await prisma.user.deleteMany({ where: { id: { in: [ctx.ownerId, ctx.strangerId, ctx.viewerId] } } });
   console.log("  Cleaned up");
@@ -354,6 +360,41 @@ async function testAdminLogs() {
   assert("Test owner (not admin email) → 403", ownerForbidden === 403, `got ${ownerForbidden}`);
 }
 
+async function testOAuthEndpoints() {
+  section("OAUTH ENDPOINTS");
+
+  // GET /api/oauth/authorize without params should return 400
+  const { status: noParams } = await api("/api/oauth/authorize");
+  assert("OAuth authorize without params → 400", noParams === 400, `got ${noParams}`);
+
+  // GET /api/oauth/authorize with valid params should redirect (302) to Google
+  const authRes = await fetch(`${BASE}/api/oauth/authorize?response_type=code&client_id=claude&redirect_uri=${encodeURIComponent("https://claude.ai/api/mcp/auth_callback")}&state=test123`, { redirect: "manual" });
+  assert("OAuth authorize → 302 redirect", authRes.status === 302, `got ${authRes.status}`);
+  const location = authRes.headers.get("location") || "";
+  assert("OAuth redirects to Google", location.includes("accounts.google.com"), `got ${location.slice(0, 80)}`);
+
+  // POST /api/oauth/token without code should return 400
+  const { status: noCode } = await api("/api/oauth/token", {
+    method: "POST",
+    body: JSON.stringify({ grant_type: "authorization_code", code: "", redirect_uri: "https://claude.ai/api/mcp/auth_callback" }),
+  });
+  assert("OAuth token without code → 400", noCode === 400, `got ${noCode}`);
+
+  // POST /api/oauth/token with invalid code should return 400
+  const { status: badCode } = await api("/api/oauth/token", {
+    method: "POST",
+    body: JSON.stringify({ grant_type: "authorization_code", code: "invalid-code", redirect_uri: "https://claude.ai/api/mcp/auth_callback" }),
+  });
+  assert("OAuth token with invalid code → 400", badCode === 400, `got ${badCode}`);
+
+  // MCP test endpoint should still work with Bearer auth
+  const { status: testStatus, body: testBody } = await api("/api/agent/mcp/test", { headers: { Authorization: `Bearer ${ctx.ownerApiKey}` } });
+  if (ctx.ownerApiKey) {
+    assert("MCP test with Bearer key → 200", testStatus === 200, `got ${testStatus}`);
+    assert("MCP test returns ok:true", testBody?.ok === true);
+  }
+}
+
 async function testEdgeCases() {
   section("EDGE CASES");
   const tok = ctx.ownerToken;
@@ -390,6 +431,7 @@ async function main() {
     await testNewUserNoProjects();
     await testNewUserSeeding();
     await testAdminLogs();
+    await testOAuthEndpoints();
     await testEdgeCases();
   } catch (err) { console.error("\n💥 Fatal:", err); }
   finally { await teardown(); await prisma.$disconnect(); }
