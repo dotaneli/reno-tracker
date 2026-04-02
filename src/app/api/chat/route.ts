@@ -239,11 +239,7 @@ export async function POST(request: Request) {
             break;
           }
 
-          // Send done event
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "done" })}\n\n`));
-          controller.close();
-
-          // Save assistant message after streaming completes
+          // Save assistant message BEFORE closing stream (Vercel kills function after response ends)
           await prisma.chatMessage.create({
             data: {
               role: "assistant",
@@ -253,6 +249,10 @@ export async function POST(request: Request) {
               projectId: body.projectId,
             },
           });
+
+          // Send done event and close
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "done" })}\n\n`));
+          controller.close();
         } catch (err) {
           log("error", "chat_stream_error", {
             error: err instanceof Error ? err.message : String(err),
