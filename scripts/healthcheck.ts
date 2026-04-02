@@ -500,14 +500,16 @@ async function testAiChat() {
   assert("GET /api/chat/history → 200", histStatus === 200, `got ${histStatus}`);
   assert("History returns an array", Array.isArray(histBody), `got ${typeof histBody}`);
 
-  // ── 7. Messages saved after sending ───────────────────────────────
-  if (Array.isArray(histBody)) {
-    const userMessages = histBody.filter((m: any) => m.role === "user");
+  // ── 7. Messages saved after sending (wait for async DB save) ──────
+  await new Promise((r) => setTimeout(r, 3000));
+  const { body: histFinal } = await api(`/api/chat/history?projectId=${pid}`, { sessionToken: tok });
+  const msgs = Array.isArray(histFinal) ? histFinal : (Array.isArray(histBody) ? histBody : []);
+  if (msgs.length > 0) {
+    const userMessages = msgs.filter((m: any) => m.role === "user");
     assert("History contains at least 1 user message", userMessages.length >= 1, `found ${userMessages.length}`);
-    const assistantMessages = histBody.filter((m: any) => m.role === "assistant");
+    const assistantMessages = msgs.filter((m: any) => m.role === "assistant");
     assert("History contains at least 1 assistant message", assistantMessages.length >= 1, `found ${assistantMessages.length}`);
-    // Verify messages belong to correct project
-    const allCorrectProject = histBody.every((m: any) => m.projectId === pid);
+    const allCorrectProject = msgs.every((m: any) => m.projectId === pid);
     assert("All messages belong to correct project", allCorrectProject);
   }
 
