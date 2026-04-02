@@ -8,10 +8,11 @@ import {
   type FormEvent,
   type KeyboardEvent,
 } from "react";
-import { MessageSquare, Send, X, ArrowLeft } from "lucide-react";
+import { MessageSquare, Send, X, ArrowLeft, Paperclip, Maximize2, Minimize2 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useProject } from "@/hooks/useProject";
 import { usePathname } from "next/navigation";
+import ReactMarkdown from "react-markdown";
 
 /* ─── Types ────────────────────────────────────────────────── */
 
@@ -122,10 +123,13 @@ export function AiChat() {
   const [streamingText, setStreamingText] = useState("");
   const [error, setError] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [pendingFile, setPendingFile] = useState<{ name: string; type: string; base64: string } | null>(null);
+  const [fullscreen, setFullscreen] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isRtl = dir === "rtl";
   const suggestions = lang === "he" ? suggestionsHe : suggestionsEn;
@@ -197,6 +201,7 @@ export function AiChat() {
 
       setMessages((prev) => [...prev, userMsg]);
       setInput("");
+      setPendingFile(null);
       setStreaming(true);
       setStreamingText("");
       setError(false);
@@ -212,6 +217,7 @@ export function AiChat() {
             message: text.trim(),
             projectId: activeProject.id,
             context: { page: pathname },
+            ...(pendingFile && { file: pendingFile }),
           }),
           signal: controller.signal,
         });
@@ -279,7 +285,7 @@ export function AiChat() {
         abortRef.current = null;
       }
     },
-    [streaming, activeProject?.id, pathname],
+    [streaming, activeProject?.id, pathname, pendingFile],
   );
 
   const handleSubmit = (e: FormEvent) => {
@@ -332,7 +338,7 @@ export function AiChat() {
       {/* ── Chat panel ── */}
       {open && (
         <div
-          className="ai-chat-panel flex flex-col overflow-hidden border border-[var(--border)] bg-[var(--bg-elevated)] shadow-2xl"
+          className={`flex flex-col overflow-hidden border border-[var(--border)] bg-[var(--bg-elevated)] shadow-2xl ${fullscreen ? "fixed inset-0 z-50 rounded-none" : "ai-chat-panel"}`}
           data-anchor={isRtl ? "left" : "right"}
           dir={dir}
         >
@@ -354,8 +360,13 @@ export function AiChat() {
             <h2 className="text-sm font-semibold text-white">
               {t("chat.title")}
             </h2>
-            {/* Spacer for centering title */}
-            <div className="w-5" />
+            <button
+              onClick={() => setFullscreen((f) => !f)}
+              className="hidden md:flex items-center justify-center text-white/70 hover:text-white"
+              aria-label="Toggle fullscreen"
+            >
+              {fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+            </button>
           </div>
 
           {/* ── Messages area ── */}
@@ -407,9 +418,13 @@ export function AiChat() {
                       : "border border-[var(--border-subtle)] bg-[var(--bg)] text-[var(--fg)]"
                   }`}
                 >
-                  <p className="whitespace-pre-wrap break-words">
-                    {msg.content}
-                  </p>
+                  {msg.role === "assistant" ? (
+                    <div className="prose prose-sm max-w-none break-words [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5 [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_table]:text-xs [&_code]:bg-[var(--border-subtle)] [&_code]:px-1 [&_code]:rounded [&_pre]:bg-[var(--bg)] [&_pre]:p-2 [&_pre]:rounded-lg [&_strong]:text-[var(--fg)]">
+                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    </div>
+                  ) : (
+                    <p className="whitespace-pre-wrap break-words">{msg.content}</p>
+                  )}
                 </div>
                 <span className="mt-1 text-[10px] text-[var(--fg-muted)]">
                   {formatTime(msg.createdAt)}
@@ -426,9 +441,9 @@ export function AiChat() {
               >
                 <div className="max-w-[85%] rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg)] px-3.5 py-2.5 text-sm leading-relaxed text-[var(--fg)]">
                   {streamingText ? (
-                    <p className="whitespace-pre-wrap break-words">
-                      {streamingText}
-                    </p>
+                    <div className="prose prose-sm max-w-none break-words [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5 [&_table]:text-xs [&_code]:bg-[var(--border-subtle)] [&_code]:px-1 [&_code]:rounded [&_strong]:text-[var(--fg)]">
+                      <ReactMarkdown>{streamingText}</ReactMarkdown>
+                    </div>
                   ) : (
                     /* Typing indicator dots */
                     <div className="flex items-center gap-1 py-1">
@@ -457,8 +472,47 @@ export function AiChat() {
           {/* ── Input bar ── */}
           <form
             onSubmit={handleSubmit}
-            className="flex items-end gap-2 border-t border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-3"
+            className="border-t border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-3"
           >
+            {/* Pending file indicator */}
+            {pendingFile && (
+              <div className="mb-2 flex items-center gap-2 rounded-lg bg-[var(--accent)]/10 px-3 py-1.5 text-xs text-[var(--accent)]">
+                <Paperclip size={12} />
+                <span className="flex-1 truncate">{pendingFile.name}</span>
+                <button type="button" onClick={() => setPendingFile(null)} className="text-[var(--fg-muted)] hover:text-[var(--alert)]">
+                  <X size={12} />
+                </button>
+              </div>
+            )}
+            <div className="flex items-end gap-2">
+            {/* Hidden file input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,.pdf"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                if (file.size > 10 * 1024 * 1024) { alert("Max 10MB"); return; }
+                const reader = new FileReader();
+                reader.onload = () => {
+                  const base64 = (reader.result as string).split(",")[1];
+                  setPendingFile({ name: file.name, type: file.type, base64 });
+                };
+                reader.readAsDataURL(file);
+                e.target.value = "";
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={streaming}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[var(--fg-muted)] transition-colors hover:bg-[var(--border-subtle)] hover:text-[var(--fg)] disabled:opacity-40"
+              title={t("item.uploadReceipt")}
+            >
+              <Paperclip size={16} />
+            </button>
             <textarea
               ref={inputRef}
               value={input}
@@ -478,6 +532,7 @@ export function AiChat() {
             >
               <Send size={16} className={isRtl ? "rotate-180" : ""} />
             </button>
+            </div>
           </form>
         </div>
       )}

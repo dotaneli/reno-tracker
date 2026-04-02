@@ -16,6 +16,7 @@ interface ChatRequestBody {
   message: string;
   projectId: string;
   context?: { page: string; nodeId?: string };
+  file?: { name: string; type: string; base64: string }; // PDF/image upload
 }
 
 // ── CORS headers (same as proxy.ts pattern) ──
@@ -78,10 +79,11 @@ export async function POST(request: Request) {
       ? ` They are viewing a specific task (nodeId: ${body.context.nodeId}).`
       : "";
     const systemPrompt = [
-      `You are the Reno Tracker AI assistant. The user is managing renovation project "${project.name}" (projectId: ${body.projectId}).`,
-      `They are currently on the ${pageName} page.${nodeCtx}`,
-      `Help them manage tasks, costs, payments, vendors, and issues. Be concise.`,
-      `Use Hebrew if the user writes in Hebrew. Use the available tools to read and modify project data.`,
+      `You are the Reno Tracker AI assistant for project "${project.name}" (projectId: ${body.projectId}).`,
+      `The user is on the ${pageName} page.${nodeCtx}`,
+      `IMPORTANT: You are scoped to this project ONLY. Always use projectId "${body.projectId}" when calling tools. Never access other projects.`,
+      `Help manage tasks, costs, payments, vendors, and issues. Be concise. Format responses with markdown (bold, lists, tables) for readability.`,
+      `Use Hebrew if the user writes in Hebrew.`,
     ].join(" ");
 
     // Build messages array
@@ -90,15 +92,38 @@ export async function POST(request: Request) {
         role: m.role as "user" | "assistant",
         content: m.content,
       })),
-      { role: "user", content: body.message.trim() },
     ];
 
-    // Convert MCP tools to Anthropic API format
-    const tools: Anthropic.Tool[] = TOOLS.map((t) => ({
-      name: t.name,
-      description: t.description,
-      input_schema: t.inputSchema as Anthropic.Tool.InputSchema,
-    }));
+    // Build current user message (may include file attachment)
+    if (body.file?.base64) {
+      const isImage = body.file.type.startsWith("image/");
+      const content: Anthropic.ContentBlockParam[] = [];
+      if (isImage) {
+        content.push({
+          type: "image",
+          source: { type: "base64", media_type: body.file.type as any, data: body.file.base64 },
+        });
+      } else {
+        // PDF or other document — send as document
+        content.push({
+          type: "document",
+          source: { type: "base64", media_type: body.file.type as any, data: body.file.base64 },
+        });
+      }
+      content.push({ type: "text", text: body.message.trim() || `Analyze this ${body.file.name}` });
+      messages.push({ role: "user", content });
+    } else {
+      messages.push({ role: "user", content: body.message.trim() });
+    }
+
+    // Convert MCP tools to Anthropic API format (exclude list_projects — scoped to one project)
+    const tools: Anthropic.Tool[] = TOOLS
+      .filter((t) => t.name !== "list_projects" && t.name !== "get_recent_logs")
+      .map((t) => ({
+        name: t.name,
+        description: t.description,
+        input_schema: t.inputSchema as Anthropic.Tool.InputSchema,
+      }));
 
     // Save user message now (before streaming)
     await prisma.chatMessage.create({
