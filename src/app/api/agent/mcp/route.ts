@@ -9,7 +9,7 @@ import { TOOLS, executeTool } from "@/lib/mcp-server";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { createHash } from "crypto";
 
-const MCP_VERSION = "2024-11-05";
+const MCP_VERSION = "2025-03-26";
 const SERVER_INFO = {
   name: "reno-tracker",
   version: "1.0.0",
@@ -117,6 +117,14 @@ async function handleSingleRequest(rpc: any, _rawRequest: Request) {
     default:
       return jsonRpcError(id, -32601, `Method not found: ${method}`);
   }
+}
+
+// GET — server metadata (some MCP clients probe with GET)
+export async function GET() {
+  return Response.json(
+    { name: SERVER_INFO.name, version: SERVER_INFO.version, protocol: MCP_VERSION, tools: TOOLS.length },
+    { headers: { "Access-Control-Allow-Origin": "*" } },
+  );
 }
 
 // Handle CORS preflight

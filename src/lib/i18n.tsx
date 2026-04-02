@@ -344,6 +344,7 @@ const dict = {
   "integ.copied": { en: "Copied!", he: "הועתק!" },
   "integ.tryIt": { en: "Try saying:", he: "נסה להגיד:" },
   "integ.trySample": { en: "Show me my renovation projects", he: "הראה לי את פרויקטי השיפוץ שלי" },
+  "integ.testConnection": { en: "Test Connection", he: "בדוק חיבור" },
 
   // ── General ──
   "general.toggleLanguage": { en: "Toggle language", he: "החלף שפה" },

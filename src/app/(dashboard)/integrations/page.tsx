@@ -35,6 +35,7 @@ type SetupData = {
   steps: { step: number; title: string; description: string; copyable?: string }[];
   key: string;
   mcpUrl?: string;
+  testUrl?: string;
 };
 
 export default function IntegrationsPage() {
@@ -47,6 +48,8 @@ export default function IntegrationsPage() {
   const [newKeyScope, setNewKeyScope] = useState("READ_WRITE");
   const [newKeyResult, setNewKeyResult] = useState<string | null>(null);
   const [loading, setLoading] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [testing, setTesting] = useState(false);
 
   const copyText = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -82,6 +85,27 @@ export default function IntegrationsPage() {
       mutate("/api/keys");
     } catch (err: any) {
       alert(err.message);
+    }
+  };
+
+  const handleTestConnection = async () => {
+    if (!setupData?.key) return;
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await fetch(`${baseUrl}/api/agent/mcp/test`, {
+        headers: { Authorization: `Bearer ${setupData.key}` },
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setTestResult({ ok: true, message: `Connected! ${data.tools} tools available, ${data.projects} project(s) found.` });
+      } else {
+        setTestResult({ ok: false, message: data.error || "Connection failed" });
+      }
+    } catch {
+      setTestResult({ ok: false, message: "Could not reach the server" });
+    } finally {
+      setTesting(false);
     }
   };
 
@@ -202,6 +226,24 @@ export default function IntegrationsPage() {
                 </div>
               ))}
             </div>
+
+            {/* Test Connection */}
+            {setupData.testUrl && (
+              <div className="space-y-2">
+                <button
+                  onClick={handleTestConnection}
+                  disabled={testing}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] px-4 py-2.5 text-xs font-semibold text-[var(--fg)] transition-all hover:bg-[var(--border-subtle)] disabled:opacity-50"
+                >
+                  {testing ? "Testing..." : t("integ.testConnection")}
+                </button>
+                {testResult && (
+                  <div className={`rounded-xl p-3 text-xs font-medium ${testResult.ok ? "bg-[var(--success-soft)] text-[var(--success)]" : "bg-[var(--alert-soft)] text-[var(--alert)]"}`}>
+                    {testResult.ok ? "✓ " : "✗ "}{testResult.message}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Try it */}
             <div className="rounded-xl bg-[var(--warm-glow)] p-3">

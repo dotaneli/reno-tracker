@@ -129,7 +129,7 @@ async function testMcpProtocol() {
   console.log("\n📡 MCP Protocol Tests");
 
   const init = await mcpCall("initialize");
-  assert(init.result?.protocolVersion === "2024-11-05", "initialize returns protocol version");
+  assert(init.result?.protocolVersion === "2025-03-26", "initialize returns protocol version");
   assert(init.result?.serverInfo?.name === "reno-tracker", "initialize returns server name");
   assert(init.result?.capabilities?.tools !== undefined, "initialize returns tools capability");
 
