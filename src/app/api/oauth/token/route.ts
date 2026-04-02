@@ -46,7 +46,7 @@ export async function POST(request: Request) {
 
   for (const p of pending) {
     try {
-      const data = JSON.parse(JSON.stringify(p.rawPayload));
+      const data = typeof p.rawPayload === "string" ? JSON.parse(p.rawPayload) : p.rawPayload;
       if (data.codeHash === codeHash) {
         if (data.expiresAt && data.expiresAt < Date.now()) {
           // Code expired, clean it up
@@ -80,7 +80,7 @@ export async function POST(request: Request) {
   // Clean up expired codes (housekeeping)
   for (const p of pending) {
     try {
-      const data = JSON.parse(JSON.stringify(p.rawPayload));
+      const data = typeof p.rawPayload === "string" ? JSON.parse(p.rawPayload) : p.rawPayload;
       if (data.expiresAt && data.expiresAt < Date.now()) {
         await prisma.pendingInbox.delete({ where: { id: p.id } }).catch(() => {});
       }

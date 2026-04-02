@@ -96,7 +96,7 @@ export async function GET(request: Request) {
   await prisma.pendingInbox.create({
     data: {
       source: "oauth_code",
-      rawPayload: JSON.stringify({ apiKey: apiKeyPlain, codeHash: authCodeHash, codeChallenge, codeChallengeMethod, expiresAt: Date.now() + 5 * 60 * 1000 }),
+      rawPayload: { apiKey: apiKeyPlain, codeHash: authCodeHash, codeChallenge, codeChallengeMethod, expiresAt: Date.now() + 5 * 60 * 1000 },
     },
   });
 
