@@ -13,6 +13,7 @@ import { useI18n } from "@/lib/i18n";
 import { useProject } from "@/hooks/useProject";
 import { usePathname } from "next/navigation";
 import ReactMarkdown from "react-markdown";
+import { ChatWidget } from "./ChatWidgets";
 
 /* ─── Types ────────────────────────────────────────────────── */
 
@@ -420,7 +421,15 @@ export function AiChat() {
                 >
                   {msg.role === "assistant" ? (
                     <div className="prose prose-sm max-w-none break-words [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5 [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_table]:text-xs [&_code]:bg-[var(--border-subtle)] [&_code]:px-1 [&_code]:rounded [&_pre]:bg-[var(--bg)] [&_pre]:p-2 [&_pre]:rounded-lg [&_strong]:text-[var(--fg)]">
-                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      <ReactMarkdown components={{
+                        code({ className, children }) {
+                          const lang = className?.replace("language-", "") || "";
+                          const text = String(children).trim();
+                          if (lang === "widget") return <ChatWidget json={text} />;
+                          return <code className={className}>{children}</code>;
+                        },
+                        pre({ children }) { return <>{children}</>; },
+                      }}>{msg.content}</ReactMarkdown>
                     </div>
                   ) : (
                     <p className="whitespace-pre-wrap break-words">{msg.content}</p>
@@ -442,7 +451,15 @@ export function AiChat() {
                 <div className="max-w-[85%] rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg)] px-3.5 py-2.5 text-sm leading-relaxed text-[var(--fg)]">
                   {streamingText ? (
                     <div className="prose prose-sm max-w-none break-words [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5 [&_table]:text-xs [&_code]:bg-[var(--border-subtle)] [&_code]:px-1 [&_code]:rounded [&_strong]:text-[var(--fg)]">
-                      <ReactMarkdown>{streamingText}</ReactMarkdown>
+                      <ReactMarkdown components={{
+                        code({ className, children }) {
+                          const lang = className?.replace("language-", "") || "";
+                          const text = String(children).trim();
+                          if (lang === "widget") return <ChatWidget json={text} />;
+                          return <code className={className}>{children}</code>;
+                        },
+                        pre({ children }) { return <>{children}</>; },
+                      }}>{streamingText}</ReactMarkdown>
                     </div>
                   ) : (
                     /* Typing indicator dots */
