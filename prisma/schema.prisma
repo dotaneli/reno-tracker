@@ -23,7 +23,8 @@ model User {
   memberships ProjectMember[]
   notes       Note[]
   snapshots   ProjectSnapshot[]
-  apiKeys     ApiKey[]
+  apiKeys      ApiKey[]
+  chatMessages ChatMessage[]
 
   @@map("users")
 }
@@ -119,6 +120,7 @@ model Project {
   snapshots      ProjectSnapshot[]
   actionLogs     ActionLog[]
   apiKeys        ApiKey[]
+  chatMessages   ChatMessage[]
 
   @@map("projects")
 }
@@ -411,6 +413,22 @@ model Issue {
 
   @@index([nodeId])
   @@map("issues")
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  role      String   // "user" | "assistant"
+  content   String
+  context   Json?    // { page, projectId, nodeId } — screen context
+  userId    String
+  projectId String
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([userId, projectId, createdAt])
+  @@map("chat_messages")
 }
 
 model PendingInbox {
