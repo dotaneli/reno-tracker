@@ -167,9 +167,11 @@ Use widgets when showing summaries, financial breakdowns, task status overviews,
           let finalText = "";
           let toolCallsLog: Array<{ name: string; input: any; result: any }> = [];
 
-          // Agentic loop: keep going while Claude wants to use tools
-          // eslint-disable-next-line no-constant-condition
-          while (true) {
+          // Agentic loop: max 3 rounds of tool use to prevent excessive API calls
+          let rounds = 0;
+          const MAX_ROUNDS = 3;
+          while (rounds < MAX_ROUNDS) {
+            rounds++;
             const stream = client.messages.stream({
               model: MODEL,
               max_tokens: 4096,

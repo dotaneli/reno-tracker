@@ -123,6 +123,7 @@ export function AiChat() {
   const [streaming, setStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState("");
   const [error, setError] = useState(false);
+  const [toolStatus, setToolStatus] = useState("");
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [pendingFile, setPendingFile] = useState<{ name: string; type: string; base64: string } | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
@@ -203,6 +204,7 @@ export function AiChat() {
       setMessages((prev) => [...prev, userMsg]);
       setInput("");
       setPendingFile(null);
+      setToolStatus("");
       setStreaming(true);
       setStreamingText("");
       setError(false);
@@ -246,19 +248,35 @@ export function AiChat() {
               if (data === "[DONE]") continue;
               try {
                 const parsed = JSON.parse(data);
-                const content =
-                  parsed.choices?.[0]?.delta?.content ??
-                  parsed.delta?.text ??
-                  parsed.text ??
-                  parsed.content ??
-                  "";
-                if (content) {
-                  accumulated += content;
+                if (parsed.type === "text" && parsed.text) {
+                  accumulated += parsed.text;
                   setStreamingText(accumulated);
+                  setToolStatus("");
+                } else if (parsed.type === "tool_call") {
+                  const toolLabels: Record<string, string> = {
+                    get_project_tree: "Loading tasks...",
+                    get_financial_summary: "Crunching numbers...",
+                    list_issues: "Checking issues...",
+                    list_vendors: "Looking up vendors...",
+                    list_categories: "Loading categories...",
+                    create_node: "Creating task...",
+                    update_node: "Updating task...",
+                    delete_node: "Deleting task...",
+                    create_milestone: "Adding payment...",
+                    update_milestone: "Updating payment...",
+                    create_issue: "Logging issue...",
+                    create_vendor: "Adding vendor...",
+                    mark_node_done: "Marking done...",
+                  };
+                  setToolStatus(toolLabels[parsed.name] || `Using ${parsed.name}...`);
+                } else if (parsed.type === "done") {
+                  // Stream complete
+                } else if (parsed.type === "error") {
+                  throw new Error(parsed.error);
                 }
-              } catch {
-                // Plain text chunk (non-JSON SSE)
-                if (data.trim()) {
+              } catch (parseErr) {
+                // Non-JSON SSE data — treat as text
+                if (data.trim() && !(parseErr instanceof Error && parseErr.message)) {
                   accumulated += data;
                   setStreamingText(accumulated);
                 }
@@ -305,6 +323,31 @@ export function AiChat() {
 
   const pageSuggestions =
     suggestions[pathname] ?? suggestions["/"] ?? [];
+
+  const mdComponents = {
+    code({ className, children }: any) {
+      const lang = className?.replace("language-", "") || "";
+      const text = String(children).trim();
+      if (lang === "widget") return <ChatWidget json={text} />;
+      return <code className={className}>{children}</code>;
+    },
+    pre({ children }: any) { return <>{children}</>; },
+    table({ children }: any) {
+      return <div className="my-2 overflow-x-auto rounded-lg border border-[var(--border-subtle)]"><table className="w-full text-xs">{children}</table></div>;
+    },
+    thead({ children }: any) {
+      return <thead className="bg-[var(--bg-elevated)] text-[var(--fg-muted)]">{children}</thead>;
+    },
+    th({ children }: any) {
+      return <th className="px-3 py-2 text-start font-semibold border-b border-[var(--border-subtle)]">{children}</th>;
+    },
+    td({ children }: any) {
+      return <td className="px-3 py-2 border-b border-[var(--border-subtle)] text-[var(--fg)]">{children}</td>;
+    },
+    tr({ children }: any) {
+      return <tr className="hover:bg-[var(--bg-elevated)]/50">{children}</tr>;
+    },
+  };
 
   function formatTime(iso: string) {
     try {
@@ -421,15 +464,7 @@ export function AiChat() {
                 >
                   {msg.role === "assistant" ? (
                     <div className="prose prose-sm max-w-none break-words [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5 [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_table]:text-xs [&_code]:bg-[var(--border-subtle)] [&_code]:px-1 [&_code]:rounded [&_pre]:bg-[var(--bg)] [&_pre]:p-2 [&_pre]:rounded-lg [&_strong]:text-[var(--fg)]">
-                      <ReactMarkdown components={{
-                        code({ className, children }) {
-                          const lang = className?.replace("language-", "") || "";
-                          const text = String(children).trim();
-                          if (lang === "widget") return <ChatWidget json={text} />;
-                          return <code className={className}>{children}</code>;
-                        },
-                        pre({ children }) { return <>{children}</>; },
-                      }}>{msg.content}</ReactMarkdown>
+                      <ReactMarkdown components={mdComponents}>{msg.content}</ReactMarkdown>
                     </div>
                   ) : (
                     <p className="whitespace-pre-wrap break-words">{msg.content}</p>
@@ -451,15 +486,7 @@ export function AiChat() {
                 <div className="max-w-[85%] rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg)] px-3.5 py-2.5 text-sm leading-relaxed text-[var(--fg)]">
                   {streamingText ? (
                     <div className="prose prose-sm max-w-none break-words [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5 [&_table]:text-xs [&_code]:bg-[var(--border-subtle)] [&_code]:px-1 [&_code]:rounded [&_strong]:text-[var(--fg)]">
-                      <ReactMarkdown components={{
-                        code({ className, children }) {
-                          const lang = className?.replace("language-", "") || "";
-                          const text = String(children).trim();
-                          if (lang === "widget") return <ChatWidget json={text} />;
-                          return <code className={className}>{children}</code>;
-                        },
-                        pre({ children }) { return <>{children}</>; },
-                      }}>{streamingText}</ReactMarkdown>
+                      <ReactMarkdown components={mdComponents}>{streamingText}</ReactMarkdown>
                     </div>
                   ) : (
                     /* Typing indicator dots */
@@ -471,7 +498,7 @@ export function AiChat() {
                   )}
                 </div>
                 <span className="mt-1 text-[10px] text-[var(--fg-muted)]">
-                  {t("chat.thinking")}
+                  {toolStatus || t("chat.thinking")}
                 </span>
               </div>
             )}
