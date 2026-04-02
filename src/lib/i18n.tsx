@@ -346,6 +346,14 @@ const dict = {
   "integ.trySample": { en: "Show me my renovation projects", he: "הראה לי את פרויקטי השיפוץ שלי" },
   "integ.testConnection": { en: "Test Connection", he: "בדוק חיבור" },
 
+  // ── AI Chat ──
+  "chat.title": { en: "AI Assistant", he: "עוזר AI" },
+  "chat.placeholder": { en: "Ask anything about your project...", he: "שאל כל דבר על הפרויקט שלך..." },
+  "chat.send": { en: "Send", he: "שלח" },
+  "chat.thinking": { en: "Thinking...", he: "חושב..." },
+  "chat.suggestions": { en: "Try asking:", he: "נסה לשאול:" },
+  "chat.error": { en: "Something went wrong. Try again.", he: "משהו השתבש. נסה שוב." },
+
   // ── General ──
   "general.toggleLanguage": { en: "Toggle language", he: "החלף שפה" },
   "general.loading": { en: "Loading...", he: "טוען..." },

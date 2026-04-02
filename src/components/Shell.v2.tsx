@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Header } from "./Header";
 import { Nav } from "./Nav";
+import { AiChat } from "./AiChat";
 import { useApi } from "@/hooks/useApi";
 import { useI18n } from "@/lib/i18n";
 import { useRouter } from "next/navigation";
@@ -60,6 +61,7 @@ export function Shell({ children }: { children: ReactNode }) {
           {children}
         </main>
       </div>
+      <AiChat />
     </div>
   );
 }

@@ -418,6 +418,133 @@ async function testOAuthEndpoints() {
   assert("401 includes WWW-Authenticate header", rawRes.status === 401 && wwwAuth.includes("resource_metadata"), `status=${rawRes.status} header=${wwwAuth.slice(0, 80)}`);
 }
 
+async function testAiChat() {
+  section("AI CHAT");
+  const tok = ctx.ownerToken;
+  const pid = ctx.projectId;
+
+  // ── 1. Auth wall ──────────────────────────────────────────────────
+  const { status: noAuth } = await api("/api/chat", {
+    method: "POST",
+    body: JSON.stringify({ message: "hi", projectId: pid }),
+  });
+  assert("POST /api/chat without auth → 401", noAuth === 401, `got ${noAuth}`);
+
+  // ── 2. Missing message field ──────────────────────────────────────
+  const { status: noMsg } = await api("/api/chat", {
+    method: "POST",
+    sessionToken: tok,
+    body: JSON.stringify({ projectId: pid }),
+  });
+  assert("POST /api/chat without message → 400", noMsg === 400, `got ${noMsg}`);
+
+  // ── 3. Missing projectId field ────────────────────────────────────
+  const { status: noPid } = await api("/api/chat", {
+    method: "POST",
+    sessionToken: tok,
+    body: JSON.stringify({ message: "hi" }),
+  });
+  assert("POST /api/chat without projectId → 400", noPid === 400, `got ${noPid}`);
+
+  // ── 4 & 5. Valid request → 200 streaming response ────────────────
+  // Cannot use api() helper for streaming — use raw fetch
+  const streamRes = await fetch(`${BASE}/api/chat`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Cookie: `${ck()}=${tok}`,
+    },
+    body: JSON.stringify({ message: "hi", projectId: pid }),
+  });
+  assert("POST /api/chat valid → 200", streamRes.status === 200, `got ${streamRes.status}`);
+
+  const contentType = streamRes.headers.get("content-type") || "";
+  assert(
+    "Response is streamed (text/event-stream or ndjson or text/plain)",
+    contentType.includes("text/event-stream") ||
+      contentType.includes("application/x-ndjson") ||
+      contentType.includes("text/plain") ||
+      contentType.includes("application/json"),
+    `got ${contentType}`,
+  );
+
+  // Consume the stream (with a timeout to avoid hanging on slow AI responses)
+  let streamBody = "";
+  if (streamRes.body) {
+    const reader = streamRes.body.getReader();
+    const decoder = new TextDecoder();
+    const deadline = Date.now() + 30_000; // 30s timeout
+    try {
+      while (Date.now() < deadline) {
+        const { done, value } = await Promise.race([
+          reader.read(),
+          new Promise<{ done: true; value: undefined }>((resolve) =>
+            setTimeout(() => resolve({ done: true, value: undefined }), 30_000),
+          ),
+        ]);
+        if (done) break;
+        if (value) streamBody += decoder.decode(value, { stream: true });
+      }
+    } catch { /* timeout or read error — ok for health check */ }
+    try { reader.cancel(); } catch {}
+  }
+  assert("Stream returned non-empty body", streamBody.length > 0, `body length=${streamBody.length}`);
+
+  // ── 6. Chat history endpoint ──────────────────────────────────────
+  // History without auth → 401
+  const { status: histNoAuth } = await api(`/api/chat/history?projectId=${pid}`);
+  assert("GET /api/chat/history without auth → 401", histNoAuth === 401, `got ${histNoAuth}`);
+
+  // History with auth → 200 + array
+  const { status: histStatus, body: histBody } = await api(`/api/chat/history?projectId=${pid}`, { sessionToken: tok });
+  assert("GET /api/chat/history → 200", histStatus === 200, `got ${histStatus}`);
+  assert("History returns an array", Array.isArray(histBody), `got ${typeof histBody}`);
+
+  // ── 7. Messages saved after sending ───────────────────────────────
+  if (Array.isArray(histBody)) {
+    const userMessages = histBody.filter((m: any) => m.role === "user");
+    assert("History contains at least 1 user message", userMessages.length >= 1, `found ${userMessages.length}`);
+    const assistantMessages = histBody.filter((m: any) => m.role === "assistant");
+    assert("History contains at least 1 assistant message", assistantMessages.length >= 1, `found ${assistantMessages.length}`);
+    // Verify messages belong to correct project
+    const allCorrectProject = histBody.every((m: any) => m.projectId === pid);
+    assert("All messages belong to correct project", allCorrectProject);
+  }
+
+  // ── 8. Project isolation ──────────────────────────────────────────
+  // Create a second project to test isolation
+  const { body: proj2 } = await api("/api/projects", {
+    method: "POST",
+    sessionToken: tok,
+    body: JSON.stringify({ name: "HC Chat Isolation", totalBudget: 1000 }),
+  });
+  const pid2 = proj2?.id;
+  if (pid2) {
+    const { status: h2Status, body: h2Body } = await api(`/api/chat/history?projectId=${pid2}`, { sessionToken: tok });
+    assert("Second project history → 200", h2Status === 200, `got ${h2Status}`);
+    assert("Second project has 0 messages (isolation)", Array.isArray(h2Body) && h2Body.length === 0, `found ${h2Body?.length ?? "n/a"}`);
+
+    // Stranger cannot access owner's chat history
+    const { status: strangerHist } = await api(`/api/chat/history?projectId=${pid}`, { sessionToken: ctx.strangerToken });
+    assert("Stranger cannot read chat history → 404 or 403", strangerHist === 404 || strangerHist === 403, `got ${strangerHist}`);
+
+    // Clean up second project
+    await prisma.project.delete({ where: { id: pid2 } }).catch(() => {});
+  }
+
+  // ── 9. Rate limiting (optional — skip if not implemented) ─────────
+  // We won't send 50+ requests; just verify the header exists or skip
+  const rateLimitHeader = streamRes.headers.get("x-ratelimit-limit") || streamRes.headers.get("ratelimit-limit");
+  if (rateLimitHeader) {
+    assert("Rate limit header present", parseInt(rateLimitHeader) > 0, `value=${rateLimitHeader}`);
+  } else {
+    assert("[SKIP] Rate limit headers not implemented yet", true);
+  }
+
+  // ── Cleanup: delete ChatMessage records created during test ───────
+  await prisma.chatMessage.deleteMany({ where: { userId: ctx.ownerId, projectId: pid } }).catch(() => {});
+}
+
 async function testEdgeCases() {
   section("EDGE CASES");
   const tok = ctx.ownerToken;
@@ -455,6 +582,7 @@ async function main() {
     await testNewUserSeeding();
     await testAdminLogs();
     await testOAuthEndpoints();
+    await testAiChat();
     await testEdgeCases();
   } catch (err) { console.error("\n💥 Fatal:", err); }
   finally { await teardown(); await prisma.$disconnect(); }

@@ -1,0 +1,294 @@
+import { resolveAuth, requireProjectAccess, AuthError } from "@/lib/dal";
+import { handleError, errorResponse } from "@/lib/api";
+import { prisma } from "@/lib/prisma";
+import { TOOLS, executeTool } from "@/lib/mcp-server";
+import { log } from "@/lib/logger";
+import Anthropic from "@anthropic-ai/sdk";
+
+const RATE_LIMIT_PER_DAY = 50;
+const MAX_HISTORY = 20;
+const MODEL = "claude-sonnet-4-20250514";
+
+interface ChatRequestBody {
+  message: string;
+  projectId: string;
+  context?: { page: string; nodeId?: string };
+}
+
+// ── CORS headers (same as proxy.ts pattern) ──
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Authorization, Content-Type",
+};
+
+export async function OPTIONS() {
+  return new Response(null, { status: 204, headers: corsHeaders });
+}
+
+export async function POST(request: Request) {
+  try {
+    const auth = await resolveAuth();
+    const { userId } = auth;
+
+    const body: ChatRequestBody = await request.json();
+    if (!body.message?.trim()) return errorResponse("message is required", 400);
+    if (!body.projectId?.trim()) return errorResponse("projectId is required", 400);
+
+    // Verify project access
+    await requireProjectAccess(userId, body.projectId);
+
+    // Rate limiting: 50 messages per day per user+project
+    const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const messageCount = await prisma.chatMessage.count({
+      where: {
+        userId,
+        projectId: body.projectId,
+        role: "user",
+        createdAt: { gte: dayAgo },
+      },
+    });
+    if (messageCount >= RATE_LIMIT_PER_DAY) {
+      return errorResponse("Rate limit exceeded: 50 messages per day per project", 429);
+    }
+
+    // Load project info for system prompt
+    const project = await prisma.project.findUnique({
+      where: { id: body.projectId },
+      select: { name: true },
+    });
+    if (!project) return errorResponse("Project not found", 404);
+
+    // Load last 20 messages for conversation history
+    const history = await prisma.chatMessage.findMany({
+      where: { userId, projectId: body.projectId },
+      orderBy: { createdAt: "desc" },
+      take: MAX_HISTORY,
+      select: { role: true, content: true },
+    });
+    history.reverse(); // oldest first
+
+    // Build system prompt
+    const pageName = body.context?.page || "unknown";
+    const nodeCtx = body.context?.nodeId
+      ? ` They are viewing a specific task (nodeId: ${body.context.nodeId}).`
+      : "";
+    const systemPrompt = [
+      `You are the Reno Tracker AI assistant. The user is managing renovation project "${project.name}" (projectId: ${body.projectId}).`,
+      `They are currently on the ${pageName} page.${nodeCtx}`,
+      `Help them manage tasks, costs, payments, vendors, and issues. Be concise.`,
+      `Use Hebrew if the user writes in Hebrew. Use the available tools to read and modify project data.`,
+    ].join(" ");
+
+    // Build messages array
+    const messages: Anthropic.MessageParam[] = [
+      ...history.map((m) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      })),
+      { role: "user", content: body.message.trim() },
+    ];
+
+    // Convert MCP tools to Anthropic API format
+    const tools: Anthropic.Tool[] = TOOLS.map((t) => ({
+      name: t.name,
+      description: t.description,
+      input_schema: t.inputSchema as Anthropic.Tool.InputSchema,
+    }));
+
+    // Save user message now (before streaming)
+    await prisma.chatMessage.create({
+      data: {
+        role: "user",
+        content: body.message.trim(),
+        context: body.context ?? undefined,
+        userId,
+        projectId: body.projectId,
+      },
+    });
+
+    // Create the Anthropic client
+    const client = new Anthropic();
+
+    // We need an agentic loop: call Claude, handle tool_use, call again, etc.
+    // Stream the final text response back to the client via SSE.
+    const encoder = new TextEncoder();
+
+    const readable = new ReadableStream({
+      async start(controller) {
+        try {
+          let currentMessages = [...messages];
+          let finalText = "";
+          let toolCallsLog: Array<{ name: string; input: any; result: any }> = [];
+
+          // Agentic loop: keep going while Claude wants to use tools
+          // eslint-disable-next-line no-constant-condition
+          while (true) {
+            const stream = client.messages.stream({
+              model: MODEL,
+              max_tokens: 4096,
+              system: systemPrompt,
+              messages: currentMessages,
+              tools,
+            });
+
+            // Collect the full response while streaming text deltas
+            let responseText = "";
+            const toolUseBlocks: Array<{ id: string; name: string; input: any }> = [];
+            let currentToolUse: { id: string; name: string; inputJson: string } | null = null;
+
+            for await (const event of stream) {
+              if (event.type === "content_block_start") {
+                const block = event.content_block;
+                if (block.type === "text") {
+                  // Text block starting
+                } else if (block.type === "tool_use") {
+                  currentToolUse = { id: block.id, name: block.name, inputJson: "" };
+                }
+              } else if (event.type === "content_block_delta") {
+                const delta = event.delta;
+                if (delta.type === "text_delta") {
+                  responseText += delta.text;
+                  // Stream the text delta as SSE
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify({ type: "text", text: delta.text })}\n\n`)
+                  );
+                } else if (delta.type === "input_json_delta" && currentToolUse) {
+                  currentToolUse.inputJson += delta.partial_json;
+                }
+              } else if (event.type === "content_block_stop") {
+                if (currentToolUse) {
+                  const input = currentToolUse.inputJson
+                    ? JSON.parse(currentToolUse.inputJson)
+                    : {};
+                  toolUseBlocks.push({
+                    id: currentToolUse.id,
+                    name: currentToolUse.name,
+                    input,
+                  });
+                  currentToolUse = null;
+                }
+              }
+            }
+
+            // Get the final message to check stop_reason
+            const finalMessage = await stream.finalMessage();
+
+            if (finalMessage.stop_reason === "tool_use" && toolUseBlocks.length > 0) {
+              // Notify client that tools are being called
+              for (const tool of toolUseBlocks) {
+                controller.enqueue(
+                  encoder.encode(
+                    `data: ${JSON.stringify({ type: "tool_call", name: tool.name })}\n\n`
+                  )
+                );
+              }
+
+              // Build the assistant message content blocks for the next turn
+              const assistantContent: Anthropic.ContentBlockParam[] = [];
+              if (responseText) {
+                assistantContent.push({ type: "text", text: responseText });
+              }
+              for (const tool of toolUseBlocks) {
+                assistantContent.push({
+                  type: "tool_use",
+                  id: tool.id,
+                  name: tool.name,
+                  input: tool.input,
+                });
+              }
+
+              // Execute each tool and build tool_result blocks
+              const toolResults: Anthropic.ToolResultBlockParam[] = [];
+              for (const tool of toolUseBlocks) {
+                try {
+                  const result = await executeTool(tool.name, tool.input, auth);
+                  toolResults.push({
+                    type: "tool_result",
+                    tool_use_id: tool.id,
+                    content: JSON.stringify(result),
+                  });
+                  toolCallsLog.push({ name: tool.name, input: tool.input, result });
+                } catch (err) {
+                  const errMsg = err instanceof Error ? err.message : String(err);
+                  toolResults.push({
+                    type: "tool_result",
+                    tool_use_id: tool.id,
+                    is_error: true,
+                    content: errMsg,
+                  });
+                  toolCallsLog.push({ name: tool.name, input: tool.input, result: { error: errMsg } });
+                }
+              }
+
+              // Add assistant turn + tool results for next iteration
+              currentMessages = [
+                ...currentMessages,
+                { role: "assistant", content: assistantContent },
+                { role: "user", content: toolResults },
+              ];
+
+              // Continue loop — Claude will process tool results
+              finalText += responseText;
+              continue;
+            }
+
+            // No more tool calls — we're done
+            finalText += responseText;
+            break;
+          }
+
+          // Send done event
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "done" })}\n\n`));
+          controller.close();
+
+          // Save assistant message after streaming completes
+          await prisma.chatMessage.create({
+            data: {
+              role: "assistant",
+              content: finalText,
+              context: toolCallsLog.length > 0 ? { toolCalls: toolCallsLog } : undefined,
+              userId,
+              projectId: body.projectId,
+            },
+          });
+        } catch (err) {
+          log("error", "chat_stream_error", {
+            error: err instanceof Error ? err.message : String(err),
+            userId,
+            projectId: body.projectId,
+          });
+          try {
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({ type: "error", error: "An error occurred while generating a response." })}\n\n`
+              )
+            );
+          } catch {
+            // controller may already be closed
+          }
+          controller.close();
+        }
+      },
+    });
+
+    return new Response(readable, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+        ...corsHeaders,
+      },
+    });
+  } catch (err) {
+    if (err instanceof AuthError) {
+      return errorResponse(err.message, err.status);
+    }
+    log("error", "chat_error", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return handleError(err);
+  }
+}
