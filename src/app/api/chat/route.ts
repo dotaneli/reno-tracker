@@ -5,6 +5,9 @@ import { TOOLS, executeTool } from "@/lib/mcp-server";
 import { log } from "@/lib/logger";
 import Anthropic from "@anthropic-ai/sdk";
 
+// Allow up to 60 seconds for AI response with tool calls
+export const maxDuration = 60;
+
 const RATE_LIMIT_PER_DAY = 50;
 const MAX_HISTORY = 20;
 const MODEL = "claude-sonnet-4-20250514";
