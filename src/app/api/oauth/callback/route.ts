@@ -18,12 +18,14 @@ export async function GET(request: Request) {
     return new Response("Missing code or state", { status: 400 });
   }
 
-  // Decode the original LLM platform's redirect_uri and state
-  let redirectUri: string, originalState: string;
+  // Decode the original LLM platform's redirect_uri, state, and PKCE
+  let redirectUri: string, originalState: string, codeChallenge: string, codeChallengeMethod: string;
   try {
     const decoded = JSON.parse(Buffer.from(stateParam, "base64url").toString());
     redirectUri = decoded.redirect_uri;
     originalState = decoded.state;
+    codeChallenge = decoded.code_challenge || "";
+    codeChallengeMethod = decoded.code_challenge_method || "";
   } catch {
     return new Response("Invalid state parameter", { status: 400 });
   }
@@ -94,7 +96,7 @@ export async function GET(request: Request) {
   await prisma.pendingInbox.create({
     data: {
       source: "oauth_code",
-      rawPayload: JSON.stringify({ apiKey: apiKeyPlain, codeHash: authCodeHash, expiresAt: Date.now() + 5 * 60 * 1000 }),
+      rawPayload: JSON.stringify({ apiKey: apiKeyPlain, codeHash: authCodeHash, codeChallenge, codeChallengeMethod, expiresAt: Date.now() + 5 * 60 * 1000 }),
     },
   });
 

@@ -10,6 +10,7 @@ export default async function proxy(req: NextRequest) {
     pathname.startsWith("/api/oauth") ||
     pathname.startsWith("/api/translate") ||
     pathname.startsWith("/api/openapi") ||
+    pathname.startsWith("/.well-known") ||
     pathname.startsWith("/_next") ||
     pathname === "/login" ||
     pathname === "/favicon.ico"
@@ -41,7 +42,15 @@ export default async function proxy(req: NextRequest) {
 
     if (!sessionToken && !bearerToken) {
       log("warn", "auth_denied", { message: pathname });
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      const baseUrl = process.env.NEXTAUTH_URL || `${req.nextUrl.protocol}//${req.nextUrl.host}`;
+      const resourceMetadataUrl = `${baseUrl}/.well-known/oauth-protected-resource${pathname}`;
+      return NextResponse.json({ error: "Unauthorized" }, {
+        status: 401,
+        headers: {
+          "WWW-Authenticate": `Bearer resource_metadata="${resourceMetadataUrl}"`,
+          "Access-Control-Allow-Origin": "*",
+        },
+      });
     }
 
     // Add CORS headers for Bearer-authenticated requests (LLM platforms)
@@ -56,5 +65,5 @@ export default async function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/api/:path*"],
+  matcher: ["/api/:path*", "/.well-known/:path*"],
 };

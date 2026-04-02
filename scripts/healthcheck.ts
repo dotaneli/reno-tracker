@@ -393,6 +393,29 @@ async function testOAuthEndpoints() {
     assert("MCP test with Bearer key → 200", testStatus === 200, `got ${testStatus}`);
     assert("MCP test returns ok:true", testBody?.ok === true);
   }
+
+  // Well-known discovery endpoints
+  const { status: prm, body: prmBody } = await api("/.well-known/oauth-protected-resource/api/agent/mcp");
+  assert("Protected resource metadata → 200", prm === 200, `got ${prm}`);
+  assert("Resource metadata has authorization_servers", Array.isArray(prmBody?.authorization_servers));
+
+  const { status: asm, body: asmBody } = await api("/.well-known/oauth-authorization-server");
+  assert("Authorization server metadata → 200", asm === 200, `got ${asm}`);
+  assert("Server metadata has authorization_endpoint", !!asmBody?.authorization_endpoint);
+  assert("Server metadata has token_endpoint", !!asmBody?.token_endpoint);
+
+  // Dynamic client registration
+  const { status: dcrStatus, body: dcrBody } = await api("/api/oauth/register", {
+    method: "POST",
+    body: JSON.stringify({ client_name: "Test Client", redirect_uris: ["https://example.com/callback"] }),
+  });
+  assert("Dynamic client registration → 201", dcrStatus === 201, `got ${dcrStatus}`);
+  assert("DCR returns client_id", !!dcrBody?.client_id);
+
+  // 401 should include WWW-Authenticate header with resource_metadata
+  const rawRes = await fetch(`${BASE}/api/agent/mcp`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", method: "initialize", id: 1 }) });
+  const wwwAuth = rawRes.headers.get("www-authenticate") || "";
+  assert("401 includes WWW-Authenticate header", rawRes.status === 401 && wwwAuth.includes("resource_metadata"), `status=${rawRes.status} header=${wwwAuth.slice(0, 80)}`);
 }
 
 async function testEdgeCases() {
