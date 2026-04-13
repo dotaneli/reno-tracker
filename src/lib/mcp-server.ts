@@ -8,15 +8,9 @@ import { resolveAuth, requireProjectAccess, getUserProjectIds, AuthError, type A
 import { logAction } from "./actionlog";
 import { uploadBase64File } from "./file-upload";
 import { queryLogs, type LogLevel } from "./logger";
+import { parseIsoDate } from "./api";
 import { del as deleteBlob } from "@vercel/blob";
 import type { ApiKeyScope } from "../generated/prisma/client";
-
-function parseIsoDate(v: unknown, field: string): Date | null {
-  if (v == null || v === "") return null;
-  const d = new Date(String(v));
-  if (isNaN(d.getTime())) throw new AuthError(`${field} must be a valid ISO 8601 date string`, 400);
-  return d;
-}
 
 // ── Tool definitions ──
 
@@ -90,9 +84,14 @@ export const TOOLS: McpTool[] = [
         name: { type: "string", description: "Task name" },
         parentId: { type: "string", description: "Parent task ID (omit for root-level task)" },
         expectedCost: { type: "number", description: "Expected cost in ILS" },
+        actualCost: { type: "number", description: "Actual cost in ILS" },
         vendorId: { type: "string", description: "Vendor/contractor ID" },
         categoryId: { type: "string", description: "Category ID" },
+        nodeType: { type: "string", description: "Node type (e.g. ROOM, APPLIANCE, FIXTURE)" },
         status: { type: "string", enum: ["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "ON_HOLD", "PENDING", "ORDERED", "DELIVERED", "INSTALLED", "CANCELLED"] },
+        startDate: { type: "string", description: "Start date (ISO 8601)" },
+        endDate: { type: "string", description: "End date (ISO 8601)" },
+        expectedDate: { type: "string", description: "Expected completion date (ISO 8601)" },
         roomIds: { type: "array", items: { type: "string" }, description: "Room IDs to assign this task to" },
       },
       required: ["projectId", "name"],
@@ -111,7 +110,13 @@ export const TOOLS: McpTool[] = [
         actualCost: { type: "number" },
         vendorId: { type: "string" },
         categoryId: { type: "string" },
+        nodeType: { type: "string" },
         parentId: { type: ["string", "null"], description: "Move task under a different parent, or null to move to root" },
+        startDate: { type: ["string", "null"], description: "Start date (ISO 8601), null to clear" },
+        endDate: { type: ["string", "null"], description: "End date (ISO 8601), null to clear" },
+        expectedDate: { type: ["string", "null"], description: "Expected completion date (ISO 8601), null to clear" },
+        completedDate: { type: ["string", "null"], description: "Completion date (ISO 8601), null to clear" },
+        sortOrder: { type: "number", description: "Sort order within siblings" },
         roomIds: { type: "array", items: { type: "string" }, description: "Replace room assignments (empty array clears)" },
       },
       required: ["nodeId"],
@@ -441,7 +446,7 @@ async function executeToolInner(toolName: string, args: Record<string, any>, aut
     }
 
     case "create_node": {
-      const { projectId, name, parentId, expectedCost, vendorId, categoryId, status, roomIds } = args;
+      const { projectId, name, parentId, expectedCost, actualCost, vendorId, categoryId, nodeType, status, startDate, endDate, expectedDate, roomIds } = args;
       if (!name?.trim()) throw new AuthError("name is required", 400);
       if (!projectId?.trim()) throw new AuthError("projectId is required", 400);
       checkProjectScope(auth, projectId);
@@ -459,15 +464,31 @@ async function executeToolInner(toolName: string, args: Record<string, any>, aut
         const cat = await prisma.category.findUnique({ where: { id: categoryId }, select: { projectId: true } });
         if (!cat || cat.projectId !== projectId) throw new AuthError("Invalid categoryId", 400);
       }
-      const node = await prisma.projectNode.create({
-        data: { name: name.trim(), projectId, parentId: parentId || null, expectedCost, vendorId: vendorId || null, categoryId: categoryId || null, status: status as any || undefined },
-        include: { vendor: true, category: true },
-      });
       if (Array.isArray(roomIds) && roomIds.length > 0) {
         const validRooms = await prisma.room.findMany({ where: { id: { in: roomIds }, floor: { projectId } }, select: { id: true } });
         if (validRooms.length !== roomIds.length) throw new AuthError("One or more roomIds are invalid for this project", 400);
-        await prisma.nodeRoom.createMany({ data: roomIds.map((roomId: string) => ({ nodeId: node.id, roomId })) });
       }
+      // Atomic single write — room links are created as part of the same Prisma transaction.
+      const node = await prisma.projectNode.create({
+        data: {
+          name: name.trim(),
+          projectId,
+          parentId: parentId || null,
+          expectedCost,
+          actualCost,
+          vendorId: vendorId || null,
+          categoryId: categoryId || null,
+          nodeType: (nodeType as any) || undefined,
+          status: (status as any) || undefined,
+          startDate: parseIsoDate(startDate, "startDate") ?? undefined,
+          endDate: parseIsoDate(endDate, "endDate") ?? undefined,
+          expectedDate: parseIsoDate(expectedDate, "expectedDate") ?? undefined,
+          rooms: Array.isArray(roomIds) && roomIds.length > 0
+            ? { create: roomIds.map((roomId: string) => ({ roomId })) }
+            : undefined,
+        },
+        include: { vendor: true, category: true, rooms: { include: { room: true } } },
+      });
       await logAction(projectId, userId, "CREATE", "node", node.id, null, node, apiKeyId);
       return node;
     }
@@ -493,10 +514,16 @@ async function executeToolInner(toolName: string, args: Record<string, any>, aut
       const data: any = {};
       if (updates.name !== undefined) data.name = updates.name.trim();
       if (updates.status !== undefined) data.status = updates.status;
+      if (updates.nodeType !== undefined) data.nodeType = updates.nodeType || null;
       if (updates.expectedCost !== undefined) data.expectedCost = updates.expectedCost;
       if (updates.actualCost !== undefined) data.actualCost = updates.actualCost;
       if (updates.vendorId !== undefined) data.vendorId = updates.vendorId || null;
       if (updates.categoryId !== undefined) data.categoryId = updates.categoryId || null;
+      if (updates.sortOrder !== undefined) data.sortOrder = Number(updates.sortOrder);
+      if (updates.startDate !== undefined) data.startDate = parseIsoDate(updates.startDate, "startDate");
+      if (updates.endDate !== undefined) data.endDate = parseIsoDate(updates.endDate, "endDate");
+      if (updates.expectedDate !== undefined) data.expectedDate = parseIsoDate(updates.expectedDate, "expectedDate");
+      if (updates.completedDate !== undefined) data.completedDate = parseIsoDate(updates.completedDate, "completedDate");
       if (updates.parentId !== undefined) {
         // Allow explicit null to move to root. Prevent circular parents.
         if (updates.parentId) {
@@ -637,14 +664,13 @@ async function executeToolInner(toolName: string, args: Record<string, any>, aut
       if (!name?.trim()) throw new AuthError("name is required", 400);
       checkProjectScope(auth, projectId);
       await requireProjectAccess(userId, projectId, ["OWNER", "EDITOR"]);
+      const trimmed = name.trim();
+      // Idempotent: return the existing vendor if one with this name already exists (case-insensitive).
       const existing = await prisma.vendor.findFirst({
-        where: { projectId, name: { equals: name.trim(), mode: "insensitive" } },
-        select: { id: true, name: true },
+        where: { projectId, name: { equals: trimmed, mode: "insensitive" } },
       });
-      if (existing) {
-        throw new AuthError(`Vendor "${existing.name}" already exists in this project (id: ${existing.id}). Reuse that vendor instead of creating a duplicate.`, 409);
-      }
-      const vendor = await prisma.vendor.create({ data: { name: name.trim(), category: category || null, phone: phone || null, email: email || null, projectId } });
+      if (existing) return existing;
+      const vendor = await prisma.vendor.create({ data: { name: trimmed, category: category || null, phone: phone || null, email: email || null, projectId } });
       await logAction(projectId, userId, "CREATE", "vendor", vendor.id, null, vendor, apiKeyId);
       return vendor;
     }

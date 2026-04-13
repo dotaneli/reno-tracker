@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { requireUser, requireNodeAccess } from "@/lib/dal";
-import { json, handleError } from "@/lib/api";
+import { json, handleError, parseIsoDate } from "@/lib/api";
 import { logAction } from "@/lib/actionlog";
 import { put } from "@vercel/blob";
 import { isBase64Upload, uploadBase64File } from "@/lib/file-upload";
@@ -47,13 +47,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       }
     }
 
+    // Validate dates up front — silent Invalid Date bugs out Prisma with a confusing error.
+    const dueParsed = dueDate !== null ? parseIsoDate(dueDate, "dueDate") : undefined;
+    const paidParsed = paidDate !== null ? parseIsoDate(paidDate, "paidDate") : undefined;
+
     const m = await prisma.paymentMilestone.update({
       where: { id: milestoneId },
       data: {
         ...(label !== null && { label: label.trim() }),
         ...(amountStr !== null && { amount: Number(amountStr) }),
-        ...(dueDate !== null && { dueDate: dueDate ? new Date(dueDate) : null }),
-        ...(paidDate !== null && { paidDate: paidDate ? new Date(paidDate) : null }),
+        ...(dueParsed !== undefined && { dueDate: dueParsed }),
+        ...(paidParsed !== undefined && { paidDate: paidParsed }),
         ...(status !== null && { status: status as any }),
         ...(receiptUrl && { receiptUrl, receiptName }),
       },

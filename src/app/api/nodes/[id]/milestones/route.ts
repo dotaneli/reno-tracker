@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { requireUser, requireNodeAccess } from "@/lib/dal";
-import { json, errorResponse, handleError } from "@/lib/api";
+import { json, errorResponse, handleError, parseIsoDate } from "@/lib/api";
 import { logAction } from "@/lib/actionlog";
 import { put } from "@vercel/blob";
 import { isBase64Upload, uploadBase64File } from "@/lib/file-upload";
@@ -75,8 +75,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
 
     const node = await prisma.projectNode.findUnique({ where: { id }, select: { projectId: true } });
+    const due = parseIsoDate(dueDate, "dueDate");
     const milestone = await prisma.paymentMilestone.create({
-      data: { label: label.trim(), amount, percentage: pct, dueDate: dueDate ? new Date(dueDate) : undefined, status: status as any, receiptUrl, receiptName, nodeId: id },
+      data: { label: label.trim(), amount, percentage: pct, dueDate: due ?? undefined, status: status as any, receiptUrl, receiptName, nodeId: id },
     });
     if (node) await logAction(node.projectId, userId, "CREATE", "milestone", milestone.id, null, milestone);
     return json(milestone, 201);

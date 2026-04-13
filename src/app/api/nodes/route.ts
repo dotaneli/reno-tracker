@@ -106,6 +106,13 @@ export async function POST(request: Request) {
       const cat = await prisma.category.findUnique({ where: { id: body.categoryId }, select: { projectId: true } });
       if (!cat || cat.projectId !== body.projectId) return errorResponse("Invalid categoryId", 400);
     }
+    if (body.roomIds?.length) {
+      const validRooms = await prisma.room.findMany({
+        where: { id: { in: body.roomIds }, floor: { projectId: body.projectId } },
+        select: { id: true },
+      });
+      if (validRooms.length !== body.roomIds.length) return errorResponse("One or more roomIds are invalid for this project", 400);
+    }
 
     // Guard: if this node has cost and is being created as a root, that's fine.
     // But if it has cost, check it won't become a parent that also has children with cost later — that's handled on update.

@@ -20,6 +20,14 @@ export function handleError(err: unknown) {
 
 export async function parseBody<T>(request: Request): Promise<T> { return await request.json() as T; }
 
+/** Parse an ISO 8601 date string. Throws AuthError(400) if invalid. Returns null for null/undefined/empty. */
+export function parseIsoDate(v: unknown, field: string): Date | null {
+  if (v == null || v === "") return null;
+  const d = new Date(String(v));
+  if (isNaN(d.getTime())) throw new AuthError(`${field} must be a valid ISO 8601 date string`, 400);
+  return d;
+}
+
 // ── Node types ──
 export interface NodeCreateBody {
   name: string;

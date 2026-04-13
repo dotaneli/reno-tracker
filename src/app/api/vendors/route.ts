@@ -31,9 +31,16 @@ export async function POST(request: Request) {
 
     await requireProjectAccess(userId, body.projectId, ["OWNER", "EDITOR"]);
 
+    const name = body.name.trim();
+    // Idempotent: if a vendor with this name (case-insensitive) already exists in the project, return it.
+    const existing = await prisma.vendor.findFirst({
+      where: { projectId: body.projectId, name: { equals: name, mode: "insensitive" } },
+    });
+    if (existing) return json(existing, 200);
+
     const vendor = await prisma.vendor.create({
       data: {
-        name: body.name.trim(),
+        name,
         projectId: body.projectId,
         category: body.category?.trim(),
         phone: body.phone?.trim(),

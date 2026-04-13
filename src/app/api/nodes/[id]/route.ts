@@ -77,8 +77,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       }
     }
 
-    // Replace room links if provided
+    // Replace room links if provided — validate project scope first
     if (body.roomIds) {
+      if (body.roomIds.length > 0) {
+        const validRooms = await prisma.room.findMany({
+          where: { id: { in: body.roomIds }, floor: { projectId } },
+          select: { id: true },
+        });
+        if (validRooms.length !== body.roomIds.length) return errorResponse("One or more roomIds are invalid for this project", 400);
+      }
       await prisma.nodeRoom.deleteMany({ where: { nodeId: id } });
       if (body.roomIds.length > 0) {
         await prisma.nodeRoom.createMany({ data: body.roomIds.map(roomId => ({ nodeId: id, roomId })) });

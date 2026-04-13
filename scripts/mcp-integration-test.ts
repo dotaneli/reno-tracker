@@ -467,11 +467,14 @@ async function testVendorDedupeAndDelete() {
   const v1 = await mcpTool("create_vendor", { projectId: PROJECT_ID, name: "Dedupe Test Co" });
   assert(!v1._error, "first vendor created");
 
-  // Case-insensitive duplicate
+  // Case-insensitive duplicate → idempotent return of existing
   const v2 = await mcpTool("create_vendor", { projectId: PROJECT_ID, name: "dedupe test co" });
-  assert(!!v2._error, "duplicate rejected");
-  assert(/already exists/i.test(v2._error?.message || ""), `error mentions already-exists (got: ${v2._error?.message})`);
-  assert(v2._error?.message?.includes(v1.id), "error includes existing id");
+  assert(!v2._error, "duplicate returns existing (idempotent)");
+  assert(v2.id === v1.id, `returns same vendor id (got ${v2.id} vs ${v1.id})`);
+
+  // Only one row should exist
+  const countAfter = await prisma.vendor.count({ where: { projectId: PROJECT_ID, name: { equals: "Dedupe Test Co", mode: "insensitive" } } });
+  assert(countAfter === 1, `only 1 vendor row in DB (got ${countAfter})`);
 
   // Assign vendor to a node
   const node = await mcpTool("create_node", { projectId: PROJECT_ID, name: "VendorLinkTest", vendorId: v1.id });
@@ -535,6 +538,141 @@ async function testMarkNodeDoneAutoPay() {
   // Clean
   await prisma.paymentMilestone.deleteMany({ where: { nodeId: node.id } });
   await prisma.projectNode.delete({ where: { id: node.id } });
+}
+
+async function testRestVendorIdempotency() {
+  console.log("\n🏗️ REST POST /api/vendors idempotent dedupe");
+  const a = await restCall("POST", "/api/vendors", { name: "RestDedupe Co", projectId: PROJECT_ID });
+  assert(a.status === 201, `first create → 201 (got ${a.status})`);
+  const b = await restCall("POST", "/api/vendors", { name: "restdedupe co", projectId: PROJECT_ID });
+  assert(b.status === 200, `duplicate name → 200 idempotent (got ${b.status})`);
+  assert(b.data?.id === a.data?.id, "same vendor id returned");
+  const count = await prisma.vendor.count({ where: { projectId: PROJECT_ID, name: { equals: "RestDedupe Co", mode: "insensitive" } } });
+  assert(count === 1, `only 1 row in DB (got ${count})`);
+}
+
+async function testRestMilestoneDateValidation() {
+  console.log("\n📅 REST milestone routes reject bad dates");
+  // Need a node with cost
+  const n = await mcpTool("create_node", { projectId: PROJECT_ID, name: "RestDateTest", expectedCost: 500 });
+  // POST with garbage dueDate
+  const bad = await restCall("POST", `/api/nodes/${n.id}/milestones`, { label: "X", amount: 100, dueDate: "not-a-date" });
+  assert(bad.status === 400, `bad dueDate → 400 (got ${bad.status})`);
+  assert(/dueDate/i.test(bad.data?.error || ""), `error mentions dueDate (got: ${bad.data?.error})`);
+  // POST with valid dueDate
+  const ok = await restCall("POST", `/api/nodes/${n.id}/milestones`, { label: "Y", amount: 100, dueDate: "2026-07-01" });
+  assert(ok.status === 201, `valid dueDate → 201 (got ${ok.status})`);
+  const msId = ok.data?.id;
+  // PATCH with bad paidDate
+  const badPatch = await restCall("PATCH", `/api/nodes/${n.id}/milestones/${msId}`, { status: "PAID", paidDate: "garbage" });
+  assert(badPatch.status === 400, `bad paidDate → 400 (got ${badPatch.status})`);
+  // PATCH with good paidDate
+  const goodPatch = await restCall("PATCH", `/api/nodes/${n.id}/milestones/${msId}`, { status: "PAID", paidDate: "2026-04-13T12:00:00.000Z" });
+  assert(goodPatch.status === 200, `good paidDate → 200 (got ${goodPatch.status})`);
+  assert(goodPatch.data?.status === "PAID" && !!goodPatch.data?.paidDate, "paid + paidDate persisted");
+  // Cleanup
+  await prisma.paymentMilestone.deleteMany({ where: { nodeId: n.id } });
+  await prisma.projectNode.delete({ where: { id: n.id } });
+}
+
+async function testRestRoomIdsValidation() {
+  console.log("\n🚪 REST node routes validate roomIds project scope");
+  // Create a room in the test project
+  const floor = await prisma.floor.create({ data: { name: "RestRoomFloor", projectId: PROJECT_ID, sortOrder: 50 } });
+  const room = await prisma.room.create({ data: { name: "RestRoom", floorId: floor.id, type: "ROOM" } });
+  // Second project + its own room
+  const proj2 = await prisma.project.create({ data: { name: "MCP Test Project 2", totalBudget: 1 } });
+  await prisma.projectMember.create({ data: { projectId: proj2.id, userId: USER_ID, role: "OWNER" } });
+  const floor2 = await prisma.floor.create({ data: { name: "OtherFloor", projectId: proj2.id, sortOrder: 0 } });
+  const roomOther = await prisma.room.create({ data: { name: "OtherRoom", floorId: floor2.id, type: "ROOM" } });
+  try {
+    // Valid via POST
+    const goodPost = await restCall("POST", "/api/nodes", { name: "ValidRooms", projectId: PROJECT_ID, roomIds: [room.id] });
+    assert(goodPost.status === 201, `valid roomIds → 201 (got ${goodPost.status})`);
+    const linkCount = await prisma.nodeRoom.count({ where: { nodeId: goodPost.data?.id } });
+    assert(linkCount === 1, `room linked (got ${linkCount})`);
+    // Cross-project room on POST
+    const badPost = await restCall("POST", "/api/nodes", { name: "CrossRoom", projectId: PROJECT_ID, roomIds: [roomOther.id] });
+    assert(badPost.status === 400, `cross-project roomIds → 400 (got ${badPost.status})`);
+    // PATCH cross-project
+    const badPatch = await restCall("PATCH", `/api/nodes/${goodPost.data?.id}`, { roomIds: [roomOther.id] });
+    assert(badPatch.status === 400, `PATCH cross-project → 400 (got ${badPatch.status})`);
+    // Cleanup created node
+    await prisma.nodeRoom.deleteMany({ where: { nodeId: goodPost.data?.id } });
+    await prisma.projectNode.delete({ where: { id: goodPost.data?.id } });
+  } finally {
+    await prisma.nodeRoom.deleteMany({ where: { roomId: { in: [room.id, roomOther.id] } } });
+    await prisma.room.delete({ where: { id: room.id } });
+    await prisma.room.delete({ where: { id: roomOther.id } });
+    await prisma.floor.delete({ where: { id: floor.id } });
+    await prisma.floor.delete({ where: { id: floor2.id } });
+    await prisma.projectMember.deleteMany({ where: { projectId: proj2.id } });
+    await prisma.project.delete({ where: { id: proj2.id } });
+  }
+}
+
+async function testMcpCreateNodeAtomic() {
+  console.log("\n⚛️  MCP create_node roomIds is atomic");
+  const floor = await prisma.floor.create({ data: { name: "AtomicFloor", projectId: PROJECT_ID, sortOrder: 60 } });
+  const room = await prisma.room.create({ data: { name: "AtomicRoom", floorId: floor.id, type: "ROOM" } });
+  try {
+    // Bad room id in the same call — must reject BEFORE node is created (no orphan)
+    const before = await prisma.projectNode.count({ where: { projectId: PROJECT_ID, name: "AtomicBad" } });
+    const bad = await mcpTool("create_node", { projectId: PROJECT_ID, name: "AtomicBad", roomIds: [room.id, "fake_invalid_cuid_0000"] });
+    assert(!!bad._error, "invalid roomId rejects the whole create");
+    const after = await prisma.projectNode.count({ where: { projectId: PROJECT_ID, name: "AtomicBad" } });
+    assert(after === before, `no orphan node created (before=${before}, after=${after})`);
+    // Good path: node + room linked in one write
+    const good = await mcpTool("create_node", { projectId: PROJECT_ID, name: "AtomicGood", roomIds: [room.id] });
+    assert(!good._error, "good create succeeds");
+    const links = await prisma.nodeRoom.count({ where: { nodeId: good.id } });
+    assert(links === 1, `link count = 1 (got ${links})`);
+    await prisma.nodeRoom.deleteMany({ where: { nodeId: good.id } });
+    await prisma.projectNode.delete({ where: { id: good.id } });
+  } finally {
+    await prisma.nodeRoom.deleteMany({ where: { roomId: room.id } });
+    await prisma.room.delete({ where: { id: room.id } });
+    await prisma.floor.delete({ where: { id: floor.id } });
+  }
+}
+
+async function testMcpNodeFieldCoverage() {
+  console.log("\n📋 MCP create/update_node field coverage (dates, nodeType, actualCost, sortOrder)");
+  // create with all the new fields
+  const created = await mcpTool("create_node", {
+    projectId: PROJECT_ID,
+    name: "FullFieldCreate",
+    expectedCost: 1000,
+    actualCost: 950,
+    nodeType: "APPLIANCE",
+    startDate: "2026-01-01",
+    endDate: "2026-02-01",
+    expectedDate: "2026-01-15",
+  });
+  assert(!created._error, `create with full fields succeeds (${created._error?.message || "ok"})`);
+  assert(Number(created.actualCost) === 950, `actualCost set (got ${created.actualCost})`);
+  assert(created.nodeType === "APPLIANCE", `nodeType set (got ${created.nodeType})`);
+  assert(!!created.startDate, "startDate set");
+  assert(!!created.endDate, "endDate set");
+  assert(!!created.expectedDate, "expectedDate set");
+
+  // update with the new fields (including null clears + completedDate + sortOrder)
+  const updated = await mcpTool("update_node", {
+    nodeId: created.id,
+    sortOrder: 42,
+    completedDate: "2026-02-10",
+    startDate: null,
+  });
+  assert(!updated._error, `update with full fields succeeds (${updated._error?.message || "ok"})`);
+  assert(updated.sortOrder === 42, `sortOrder updated (got ${updated.sortOrder})`);
+  assert(!!updated.completedDate, "completedDate set");
+  assert(updated.startDate === null, `startDate cleared (got ${updated.startDate})`);
+
+  // invalid date on update is rejected
+  const bad = await mcpTool("update_node", { nodeId: created.id, endDate: "garbage" });
+  assert(!!bad._error, "bad endDate rejected");
+
+  await prisma.projectNode.delete({ where: { id: created.id } });
 }
 
 async function testReadOnlyScope() {
@@ -796,6 +934,13 @@ async function main() {
     await testVendorDedupeAndDelete();
     await testReceiptListAndDelete();
     await testMarkNodeDoneAutoPay();
+
+    // REST + MCP parity for the bugs the council surfaced
+    await testRestVendorIdempotency();
+    await testRestMilestoneDateValidation();
+    await testRestRoomIdsValidation();
+    await testMcpCreateNodeAtomic();
+    await testMcpNodeFieldCoverage();
 
     // Auth: scope enforcement
     await testReadOnlyScope();
