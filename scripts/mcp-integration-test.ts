@@ -134,7 +134,7 @@ async function testMcpProtocol() {
   assert(init.result?.capabilities?.tools !== undefined, "initialize returns tools capability");
 
   const tools = await mcpCall("tools/list");
-  assert(tools.result?.tools?.length === 17, `tools/list returns 17 tools (got ${tools.result?.tools?.length})`);
+  assert(tools.result?.tools?.length === 21, `tools/list returns 21 tools (got ${tools.result?.tools?.length})`);
 
   const ping = await mcpCall("ping");
   assert(ping.result !== undefined, "ping responds");
