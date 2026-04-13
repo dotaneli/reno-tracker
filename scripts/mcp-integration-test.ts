@@ -644,14 +644,15 @@ async function testMcpNodeFieldCoverage() {
     name: "FullFieldCreate",
     expectedCost: 1000,
     actualCost: 950,
-    nodeType: "APPLIANCE",
+    nodeType: "KITCHEN",
     startDate: "2026-01-01",
     endDate: "2026-02-01",
     expectedDate: "2026-01-15",
   });
   assert(!created._error, `create with full fields succeeds (${created._error?.message || "ok"})`);
+  if (created._error || !created.id) return; // bail early on failure to avoid cascading prisma errors
   assert(Number(created.actualCost) === 950, `actualCost set (got ${created.actualCost})`);
-  assert(created.nodeType === "APPLIANCE", `nodeType set (got ${created.nodeType})`);
+  assert(created.nodeType === "KITCHEN", `nodeType set (got ${created.nodeType})`);
   assert(!!created.startDate, "startDate set");
   assert(!!created.endDate, "endDate set");
   assert(!!created.expectedDate, "expectedDate set");
