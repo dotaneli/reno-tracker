@@ -8,7 +8,15 @@ import { resolveAuth, requireProjectAccess, getUserProjectIds, AuthError, type A
 import { logAction } from "./actionlog";
 import { uploadBase64File } from "./file-upload";
 import { queryLogs, type LogLevel } from "./logger";
+import { del as deleteBlob } from "@vercel/blob";
 import type { ApiKeyScope } from "../generated/prisma/client";
+
+function parseIsoDate(v: unknown, field: string): Date | null {
+  if (v == null || v === "") return null;
+  const d = new Date(String(v));
+  if (isNaN(d.getTime())) throw new AuthError(`${field} must be a valid ISO 8601 date string`, 400);
+  return d;
+}
 
 // ── Tool definitions ──
 
@@ -85,6 +93,7 @@ export const TOOLS: McpTool[] = [
         vendorId: { type: "string", description: "Vendor/contractor ID" },
         categoryId: { type: "string", description: "Category ID" },
         status: { type: "string", enum: ["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "ON_HOLD", "PENDING", "ORDERED", "DELIVERED", "INSTALLED", "CANCELLED"] },
+        roomIds: { type: "array", items: { type: "string" }, description: "Room IDs to assign this task to" },
       },
       required: ["projectId", "name"],
     },
@@ -102,7 +111,8 @@ export const TOOLS: McpTool[] = [
         actualCost: { type: "number" },
         vendorId: { type: "string" },
         categoryId: { type: "string" },
-        parentId: { type: "string", description: "Move task under a different parent (null for root)" },
+        parentId: { type: ["string", "null"], description: "Move task under a different parent, or null to move to root" },
+        roomIds: { type: "array", items: { type: "string" }, description: "Replace room assignments (empty array clears)" },
       },
       required: ["nodeId"],
     },
@@ -213,6 +223,42 @@ export const TOOLS: McpTool[] = [
     },
   },
   {
+    name: "list_receipts",
+    description: "List all receipts uploaded for a specific task, including file URLs for viewing/downloading.",
+    inputSchema: {
+      type: "object",
+      properties: { nodeId: { type: "string" } },
+      required: ["nodeId"],
+    },
+  },
+  {
+    name: "delete_receipt",
+    description: "Delete a receipt by id. Removes both the stored file and the database record.",
+    inputSchema: {
+      type: "object",
+      properties: { receiptId: { type: "string" } },
+      required: ["receiptId"],
+    },
+  },
+  {
+    name: "delete_vendor",
+    description: "Delete a vendor from a project. Any tasks referencing this vendor will have their vendor cleared (set to null).",
+    inputSchema: {
+      type: "object",
+      properties: { vendorId: { type: "string" } },
+      required: ["vendorId"],
+    },
+  },
+  {
+    name: "list_rooms",
+    description: "List all rooms across all floors in a project. Use room IDs with create_node/update_node roomIds to assign tasks to rooms.",
+    inputSchema: {
+      type: "object",
+      properties: { projectId: { type: "string" } },
+      required: ["projectId"],
+    },
+  },
+  {
     name: "get_recent_logs",
     description: "Query recent system logs (errors, auth events, seed results). Admin-only. Use to investigate issues and debug problems.",
     inputSchema: {
@@ -230,7 +276,7 @@ export const TOOLS: McpTool[] = [
 
 // ── Scope checking ──
 
-const READ_TOOLS = new Set(["list_projects", "get_project_tree", "get_financial_summary", "list_issues", "list_vendors", "list_categories"]);
+const READ_TOOLS = new Set(["list_projects", "get_project_tree", "get_financial_summary", "list_issues", "list_vendors", "list_categories", "list_receipts", "list_rooms"]);
 
 const ADMIN_TOOLS = new Set(["get_recent_logs"]);
 
@@ -255,6 +301,21 @@ function checkProjectScope(auth: AuthResult, projectId: string) {
 // ── Tool execution ──
 
 export async function executeTool(toolName: string, args: Record<string, any>, auth: AuthResult): Promise<any> {
+  try {
+    return await executeToolInner(toolName, args, auth);
+  } catch (err: any) {
+    if (err instanceof AuthError) throw err;
+    // Wrap unknown Prisma / runtime errors into actionable messages
+    const code = err?.code;
+    if (code === "P2025") throw new AuthError("Record not found", 404);
+    if (code === "P2002") throw new AuthError(`Unique constraint violation: ${err?.meta?.target || "duplicate value"}`, 409);
+    if (code === "P2003") throw new AuthError("Foreign key constraint failed — referenced record does not exist", 400);
+    const msg = err?.message ? String(err.message).slice(0, 500) : "Internal error";
+    throw new AuthError(`Tool "${toolName}" failed: ${msg}`, 500);
+  }
+}
+
+async function executeToolInner(toolName: string, args: Record<string, any>, auth: AuthResult): Promise<any> {
   requireScope(auth, toolName);
   const { userId } = auth;
   const apiKeyId = auth.type === "apiKey" ? auth.keyId : null;
@@ -380,7 +441,7 @@ export async function executeTool(toolName: string, args: Record<string, any>, a
     }
 
     case "create_node": {
-      const { projectId, name, parentId, expectedCost, vendorId, categoryId, status } = args;
+      const { projectId, name, parentId, expectedCost, vendorId, categoryId, status, roomIds } = args;
       if (!name?.trim()) throw new AuthError("name is required", 400);
       if (!projectId?.trim()) throw new AuthError("projectId is required", 400);
       checkProjectScope(auth, projectId);
@@ -402,6 +463,11 @@ export async function executeTool(toolName: string, args: Record<string, any>, a
         data: { name: name.trim(), projectId, parentId: parentId || null, expectedCost, vendorId: vendorId || null, categoryId: categoryId || null, status: status as any || undefined },
         include: { vendor: true, category: true },
       });
+      if (Array.isArray(roomIds) && roomIds.length > 0) {
+        const validRooms = await prisma.room.findMany({ where: { id: { in: roomIds }, floor: { projectId } }, select: { id: true } });
+        if (validRooms.length !== roomIds.length) throw new AuthError("One or more roomIds are invalid for this project", 400);
+        await prisma.nodeRoom.createMany({ data: roomIds.map((roomId: string) => ({ nodeId: node.id, roomId })) });
+      }
       await logAction(projectId, userId, "CREATE", "node", node.id, null, node, apiKeyId);
       return node;
     }
@@ -431,7 +497,30 @@ export async function executeTool(toolName: string, args: Record<string, any>, a
       if (updates.actualCost !== undefined) data.actualCost = updates.actualCost;
       if (updates.vendorId !== undefined) data.vendorId = updates.vendorId || null;
       if (updates.categoryId !== undefined) data.categoryId = updates.categoryId || null;
-      if (updates.parentId !== undefined) data.parentId = updates.parentId || null;
+      if (updates.parentId !== undefined) {
+        // Allow explicit null to move to root. Prevent circular parents.
+        if (updates.parentId) {
+          let cur: string | null = updates.parentId;
+          while (cur) {
+            if (cur === nodeId) throw new AuthError("Circular parent reference", 400);
+            const p: { parentId: string | null } | null = await prisma.projectNode.findUnique({ where: { id: cur }, select: { parentId: true } });
+            cur = p?.parentId ?? null;
+          }
+          const parentNode = await prisma.projectNode.findUnique({ where: { id: updates.parentId }, select: { projectId: true } });
+          if (!parentNode || parentNode.projectId !== nodeInfo.projectId) throw new AuthError("Invalid parentId", 400);
+        }
+        data.parentId = updates.parentId || null;
+      }
+      if (Array.isArray(updates.roomIds)) {
+        const validRooms = updates.roomIds.length > 0
+          ? await prisma.room.findMany({ where: { id: { in: updates.roomIds }, floor: { projectId: nodeInfo.projectId } }, select: { id: true } })
+          : [];
+        if (validRooms.length !== updates.roomIds.length) throw new AuthError("One or more roomIds are invalid for this project", 400);
+        await prisma.nodeRoom.deleteMany({ where: { nodeId } });
+        if (updates.roomIds.length > 0) {
+          await prisma.nodeRoom.createMany({ data: updates.roomIds.map((roomId: string) => ({ nodeId, roomId })) });
+        }
+      }
       const node = await prisma.projectNode.update({ where: { id: nodeId }, data });
       await logAction(nodeInfo.projectId, userId, "UPDATE", "node", nodeId, oldNode, node, apiKeyId);
       return node;
@@ -485,8 +574,9 @@ export async function executeTool(toolName: string, args: Record<string, any>, a
         throw new AuthError("amount or percentage is required", 400);
       }
 
+      const due = parseIsoDate(dueDate, "dueDate");
       const milestone = await prisma.paymentMilestone.create({
-        data: { label: label.trim(), amount: finalAmount, percentage: pct, dueDate: dueDate ? new Date(dueDate) : undefined, nodeId },
+        data: { label: label.trim(), amount: finalAmount, percentage: pct, dueDate: due ?? undefined, nodeId },
       });
       await logAction(node.projectId, userId, "CREATE", "milestone", milestone.id, null, milestone, apiKeyId);
       return milestone;
@@ -503,9 +593,13 @@ export async function executeTool(toolName: string, args: Record<string, any>, a
       const data: any = {};
       if (updates.label !== undefined) data.label = updates.label.trim();
       if (updates.amount !== undefined) data.amount = Number(updates.amount);
-      if (updates.status !== undefined) data.status = updates.status;
-      if (updates.paidDate !== undefined) data.paidDate = updates.paidDate ? new Date(updates.paidDate) : null;
-      if (updates.dueDate !== undefined) data.dueDate = updates.dueDate ? new Date(updates.dueDate) : null;
+      if (updates.status !== undefined) {
+        const allowed = ["PENDING", "DUE", "PAID", "OVERDUE"];
+        if (!allowed.includes(updates.status)) throw new AuthError(`status must be one of ${allowed.join(", ")}`, 400);
+        data.status = updates.status;
+      }
+      if (updates.paidDate !== undefined) data.paidDate = parseIsoDate(updates.paidDate, "paidDate");
+      if (updates.dueDate !== undefined) data.dueDate = parseIsoDate(updates.dueDate, "dueDate");
       const m = await prisma.paymentMilestone.update({ where: { id: milestoneId }, data });
       await logAction(node.projectId, userId, "UPDATE", "milestone", milestoneId, oldMs, m, apiKeyId);
       return m;
@@ -540,11 +634,44 @@ export async function executeTool(toolName: string, args: Record<string, any>, a
 
     case "create_vendor": {
       const { projectId, name, category, phone, email } = args;
+      if (!name?.trim()) throw new AuthError("name is required", 400);
       checkProjectScope(auth, projectId);
       await requireProjectAccess(userId, projectId, ["OWNER", "EDITOR"]);
+      const existing = await prisma.vendor.findFirst({
+        where: { projectId, name: { equals: name.trim(), mode: "insensitive" } },
+        select: { id: true, name: true },
+      });
+      if (existing) {
+        throw new AuthError(`Vendor "${existing.name}" already exists in this project (id: ${existing.id}). Reuse that vendor instead of creating a duplicate.`, 409);
+      }
       const vendor = await prisma.vendor.create({ data: { name: name.trim(), category: category || null, phone: phone || null, email: email || null, projectId } });
       await logAction(projectId, userId, "CREATE", "vendor", vendor.id, null, vendor, apiKeyId);
       return vendor;
+    }
+
+    case "delete_vendor": {
+      const { vendorId } = args;
+      const vendor = await prisma.vendor.findUnique({ where: { id: vendorId } });
+      if (!vendor) throw new AuthError("Vendor not found", 404);
+      checkProjectScope(auth, vendor.projectId);
+      await requireProjectAccess(userId, vendor.projectId, ["OWNER", "EDITOR"]);
+      // Null out references from nodes before delete
+      await prisma.projectNode.updateMany({ where: { vendorId }, data: { vendorId: null } });
+      await prisma.vendor.delete({ where: { id: vendorId } });
+      await logAction(vendor.projectId, userId, "DELETE", "vendor", vendorId, vendor, null, apiKeyId);
+      return { deleted: true, id: vendorId };
+    }
+
+    case "list_rooms": {
+      const { projectId } = args;
+      checkProjectScope(auth, projectId);
+      await requireProjectAccess(userId, projectId);
+      const rooms = await prisma.room.findMany({
+        where: { floor: { projectId } },
+        include: { floor: { select: { id: true, name: true } } },
+        orderBy: [{ floor: { name: "asc" } }, { name: "asc" }],
+      });
+      return rooms.map((r) => ({ id: r.id, name: r.name, type: r.type, floorId: r.floorId, floorName: r.floor.name }));
     }
 
     case "upload_receipt": {
@@ -555,7 +682,33 @@ export async function executeTool(toolName: string, args: Record<string, any>, a
       await requireProjectAccess(userId, node.projectId, ["OWNER", "EDITOR"]);
       const result = await uploadBase64File(fileName, fileBase64, `receipts/${nodeId}`);
       const receipt = await prisma.receipt.create({ data: { fileUrl: result.url, fileName: result.name, fileSize: result.size, nodeId } });
+      await logAction(node.projectId, userId, "CREATE", "receipt", receipt.id, null, receipt, apiKeyId);
       return receipt;
+    }
+
+    case "list_receipts": {
+      const { nodeId } = args;
+      const node = await prisma.projectNode.findUnique({ where: { id: nodeId }, select: { projectId: true } });
+      if (!node) throw new AuthError("Node not found", 404);
+      checkProjectScope(auth, node.projectId);
+      await requireProjectAccess(userId, node.projectId);
+      const receipts = await prisma.receipt.findMany({
+        where: { nodeId },
+        orderBy: { uploadedAt: "desc" },
+      });
+      return receipts.map((r) => ({ id: r.id, fileUrl: r.fileUrl, fileName: r.fileName, fileSize: r.fileSize, uploadedAt: r.uploadedAt }));
+    }
+
+    case "delete_receipt": {
+      const { receiptId } = args;
+      const receipt = await prisma.receipt.findUnique({ where: { id: receiptId }, include: { node: { select: { projectId: true } } } });
+      if (!receipt) throw new AuthError("Receipt not found", 404);
+      checkProjectScope(auth, receipt.node.projectId);
+      await requireProjectAccess(userId, receipt.node.projectId, ["OWNER", "EDITOR"]);
+      await deleteBlob(receipt.fileUrl).catch(() => {});
+      await prisma.receipt.delete({ where: { id: receiptId } });
+      await logAction(receipt.node.projectId, userId, "DELETE", "receipt", receiptId, receipt, null, apiKeyId);
+      return { deleted: true, id: receiptId };
     }
 
     case "get_recent_logs": {

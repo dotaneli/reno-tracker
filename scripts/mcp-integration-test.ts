@@ -369,6 +369,174 @@ async function testUploadReceipt() {
   }
 }
 
+async function testMoveToRoot() {
+  console.log("\n🌲 update_node parentId=null (move to root)");
+  // Create parent + child
+  const parent = await mcpTool("create_node", { projectId: PROJECT_ID, name: "MoveTest Parent" });
+  const child = await mcpTool("create_node", { projectId: PROJECT_ID, name: "MoveTest Child", parentId: parent.id });
+  assert(child.parentId === parent.id, "child starts under parent");
+  // Move to root via null
+  const moved = await mcpTool("update_node", { nodeId: child.id, parentId: null });
+  assert(!moved._error, `move to root succeeds (${moved._error?.message || "ok"})`);
+  assert(moved.parentId === null, `child now at root (got ${moved.parentId})`);
+  // Move back under parent
+  const back = await mcpTool("update_node", { nodeId: child.id, parentId: parent.id });
+  assert(back.parentId === parent.id, "can move back under parent");
+  // Clean
+  await prisma.projectNode.deleteMany({ where: { id: { in: [child.id, parent.id] } } });
+}
+
+async function testRoomAssignment() {
+  console.log("\n🚪 list_rooms + roomIds on create/update_node");
+  // Create floor + room
+  const floor = await prisma.floor.create({ data: { name: "Test Floor", projectId: PROJECT_ID, sortOrder: 99 } });
+  const room = await prisma.room.create({ data: { name: "Test Room", floorId: floor.id, type: "ROOM" } });
+  try {
+    const rooms = await mcpTool("list_rooms", { projectId: PROJECT_ID });
+    assert(!rooms._error, "list_rooms succeeds");
+    assert(Array.isArray(rooms) && rooms.some((r: any) => r.id === room.id), "test room in list");
+
+    // Create node with roomIds
+    const node = await mcpTool("create_node", { projectId: PROJECT_ID, name: "RoomTest Node", roomIds: [room.id] });
+    assert(!node._error, "create_node with roomIds succeeds");
+    const links = await prisma.nodeRoom.findMany({ where: { nodeId: node.id } });
+    assert(links.length === 1 && links[0].roomId === room.id, `1 room link created (got ${links.length})`);
+
+    // Clear via update
+    const cleared = await mcpTool("update_node", { nodeId: node.id, roomIds: [] });
+    assert(!cleared._error, "update_node roomIds=[] succeeds");
+    const afterClear = await prisma.nodeRoom.count({ where: { nodeId: node.id } });
+    assert(afterClear === 0, `roomIds=[] clears links (got ${afterClear})`);
+
+    // Re-assign via update
+    const reassigned = await mcpTool("update_node", { nodeId: node.id, roomIds: [room.id] });
+    assert(!reassigned._error, "update_node roomIds=[room] succeeds");
+    const afterReassign = await prisma.nodeRoom.count({ where: { nodeId: node.id } });
+    assert(afterReassign === 1, `room re-linked (got ${afterReassign})`);
+
+    // Invalid room ID rejected
+    const bad = await mcpTool("update_node", { nodeId: node.id, roomIds: ["ckinvalid_fake_id_0000000"] });
+    assert(!!bad._error, "invalid roomId rejected");
+
+    await prisma.nodeRoom.deleteMany({ where: { nodeId: node.id } });
+    await prisma.projectNode.delete({ where: { id: node.id } });
+  } finally {
+    await prisma.nodeRoom.deleteMany({ where: { roomId: room.id } });
+    await prisma.room.delete({ where: { id: room.id } });
+    await prisma.floor.delete({ where: { id: floor.id } });
+  }
+}
+
+async function testMilestoneDateValidation() {
+  console.log("\n📅 milestone date validation + error messaging");
+  // Create a node to attach milestones to
+  const node = await mcpTool("create_node", { projectId: PROJECT_ID, name: "MilestoneDateTest", expectedCost: 1000 });
+
+  // Valid dueDate
+  const ok = await mcpTool("create_milestone", { nodeId: node.id, label: "Valid", amount: 100, dueDate: "2026-06-15" });
+  assert(!ok._error, "valid dueDate accepted");
+
+  // Invalid dueDate string
+  const bad = await mcpTool("create_milestone", { nodeId: node.id, label: "Bad", amount: 100, dueDate: "not-a-date" });
+  assert(!!bad._error, "invalid dueDate rejected");
+  assert(/dueDate/i.test(bad._error?.message || ""), `error mentions dueDate (got: ${bad._error?.message})`);
+
+  // Missing amount + percentage
+  const noAmount = await mcpTool("create_milestone", { nodeId: node.id, label: "NoAmount" });
+  assert(!!noAmount._error, "no amount/percentage rejected");
+
+  // update_milestone with bad paidDate
+  const msId = ok.id;
+  const badUpdate = await mcpTool("update_milestone", { nodeId: node.id, milestoneId: msId, status: "PAID", paidDate: "garbage-date" });
+  assert(!!badUpdate._error, "bad paidDate rejected");
+
+  // update_milestone PAID + valid paidDate
+  const goodUpdate = await mcpTool("update_milestone", { nodeId: node.id, milestoneId: msId, status: "PAID", paidDate: "2026-04-13T12:00:00.000Z" });
+  assert(!goodUpdate._error, `valid PAID update succeeds (${goodUpdate._error?.message || "ok"})`);
+  assert(goodUpdate.status === "PAID", "status is PAID");
+  assert(!!goodUpdate.paidDate, "paidDate set");
+
+  // Clean
+  await prisma.paymentMilestone.deleteMany({ where: { nodeId: node.id } });
+  await prisma.projectNode.delete({ where: { id: node.id } });
+}
+
+async function testVendorDedupeAndDelete() {
+  console.log("\n🏗️ create_vendor dedupe + delete_vendor");
+  // First create
+  const v1 = await mcpTool("create_vendor", { projectId: PROJECT_ID, name: "Dedupe Test Co" });
+  assert(!v1._error, "first vendor created");
+
+  // Case-insensitive duplicate
+  const v2 = await mcpTool("create_vendor", { projectId: PROJECT_ID, name: "dedupe test co" });
+  assert(!!v2._error, "duplicate rejected");
+  assert(/already exists/i.test(v2._error?.message || ""), `error mentions already-exists (got: ${v2._error?.message})`);
+  assert(v2._error?.message?.includes(v1.id), "error includes existing id");
+
+  // Assign vendor to a node
+  const node = await mcpTool("create_node", { projectId: PROJECT_ID, name: "VendorLinkTest", vendorId: v1.id });
+  assert(node.vendorId === v1.id, "node linked to vendor");
+
+  // Delete vendor
+  const del = await mcpTool("delete_vendor", { vendorId: v1.id });
+  assert(!del._error, `delete_vendor succeeds (${del._error?.message || "ok"})`);
+
+  // Verify node vendorId cleared
+  const after = await prisma.projectNode.findUnique({ where: { id: node.id } });
+  assert(after?.vendorId === null, `node vendorId cleared (got ${after?.vendorId})`);
+  // Verify vendor gone
+  const gone = await prisma.vendor.findUnique({ where: { id: v1.id } });
+  assert(gone === null, "vendor row deleted");
+
+  // Clean
+  await prisma.projectNode.delete({ where: { id: node.id } });
+}
+
+async function testReceiptListAndDelete() {
+  console.log("\n📎 list_receipts + delete_receipt");
+  // Try to upload a receipt; may skip if blob token missing
+  const fake = Buffer.from("%PDF-1.4 test").toString("base64");
+  const up = await mcpTool("upload_receipt", { nodeId: CHILD_NODE_ID, fileName: "list-test.pdf", fileBase64: fake });
+  if (up._error?.message?.includes("BLOB_READ_WRITE_TOKEN")) {
+    console.log("  ⊘ receipt list/delete skipped (no BLOB token in env)");
+    passed++;
+    return;
+  }
+  assert(!up._error, `upload for list test (${up._error?.message || "ok"})`);
+
+  const list = await mcpTool("list_receipts", { nodeId: CHILD_NODE_ID });
+  assert(Array.isArray(list), "list_receipts returns array");
+  assert(list.some((r: any) => r.id === up.id), "uploaded receipt is in list");
+  assert(list[0].fileUrl && list[0].fileName, "receipt has url + name");
+
+  // Delete it
+  const del = await mcpTool("delete_receipt", { receiptId: up.id });
+  assert(!del._error, `delete_receipt succeeds (${del._error?.message || "ok"})`);
+  const afterList = await mcpTool("list_receipts", { nodeId: CHILD_NODE_ID });
+  assert(!afterList.some((r: any) => r.id === up.id), "receipt gone from list");
+}
+
+async function testMarkNodeDoneAutoPay() {
+  console.log("\n💸 mark_node_done auto-pays milestones");
+  // Create a node with 2 unpaid milestones
+  const node = await mcpTool("create_node", { projectId: PROJECT_ID, name: "AutoPayTest", expectedCost: 2000 });
+  const m1 = await mcpTool("create_milestone", { nodeId: node.id, label: "Half 1", amount: 1000 });
+  const m2 = await mcpTool("create_milestone", { nodeId: node.id, label: "Half 2", amount: 1000 });
+  assert(m1.status === "PENDING" && m2.status === "PENDING", "both start PENDING");
+
+  const done = await mcpTool("mark_node_done", { nodeId: node.id });
+  assert(!done._error, "mark_node_done succeeds");
+  assert(done.milestonesMarkedPaid === 2, `auto-paid 2 milestones (got ${done.milestonesMarkedPaid})`);
+
+  const rows = await prisma.paymentMilestone.findMany({ where: { nodeId: node.id } });
+  assert(rows.every((r) => r.status === "PAID"), "all milestones PAID");
+  assert(rows.every((r) => r.paidDate !== null), "all have paidDate");
+
+  // Clean
+  await prisma.paymentMilestone.deleteMany({ where: { nodeId: node.id } });
+  await prisma.projectNode.delete({ where: { id: node.id } });
+}
+
 async function testReadOnlyScope() {
   console.log("\n🔒 READ_ONLY scope enforcement");
 
@@ -620,6 +788,14 @@ async function main() {
 
     // File upload
     await testUploadReceipt();
+
+    // New tests: move-to-root, rooms, milestone dates, vendor dedupe/delete, receipt list/delete, auto-pay
+    await testMoveToRoot();
+    await testRoomAssignment();
+    await testMilestoneDateValidation();
+    await testVendorDedupeAndDelete();
+    await testReceiptListAndDelete();
+    await testMarkNodeDoneAutoPay();
 
     // Auth: scope enforcement
     await testReadOnlyScope();

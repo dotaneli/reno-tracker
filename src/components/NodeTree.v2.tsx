@@ -68,7 +68,8 @@ export function NodeTree({ nodes, depth = 0, projectId, vendors, categories, flo
     if (!over || active.id === over.id) return;
     const targetId = over.id as string;
     const activeNode = findNode(nodes, active.id as string);
-    if (targetId === "root-drop") {
+    if (targetId === "root-drop" || targetId === "root-drop-area" || targetId === "root-drop-bottom") {
+      if (activeNode && activeNode.parentId == null) return;
       await apiPatch(`/api/nodes/${active.id}`, { parentId: null });
     } else {
       if (activeNode && isDescendant(activeNode, targetId)) return;
@@ -82,12 +83,15 @@ export function NodeTree({ nodes, depth = 0, projectId, vendors, categories, flo
   if (depth === 0) {
     return (
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <RootDropZone active={!!activeId} label={t("task.moveToRoot")} />
-        <div className="space-y-2">
-          {nodes.map((node) => (
-            <DraggableNode key={node.id} node={node} depth={0} projectId={projectId} vendors={vendors} categories={categories} floors={floors} allNodes={allNodes} editNodeId={editNodeId} onMutate={onMutate} onEdit={onEdit} onEditDone={onEditDone} onEditCancel={onEditCancel} tr={tr} fmt={fmt} parentVendor={parentVendor} parentCost={parentCost} allProjectMilestones={allProjectMilestones} />
-          ))}
-        </div>
+        <RootDropArea active={!!activeId}>
+          <RootDropZone id="root-drop" active={!!activeId} label={t("task.moveToRoot")} />
+          <div className="space-y-2">
+            {nodes.map((node) => (
+              <DraggableNode key={node.id} node={node} depth={0} projectId={projectId} vendors={vendors} categories={categories} floors={floors} allNodes={allNodes} editNodeId={editNodeId} onMutate={onMutate} onEdit={onEdit} onEditDone={onEditDone} onEditCancel={onEditCancel} tr={tr} fmt={fmt} parentVendor={parentVendor} parentCost={parentCost} allProjectMilestones={allProjectMilestones} />
+            ))}
+          </div>
+          <RootDropZone id="root-drop-bottom" active={!!activeId} label={t("task.moveToRoot")} />
+        </RootDropArea>
         <DragOverlay>
           {activeNode && (
             <div className="rounded-xl border-2 border-[var(--accent)] bg-[var(--bg-elevated)] p-3 opacity-90 shadow-xl">
@@ -108,12 +112,21 @@ export function NodeTree({ nodes, depth = 0, projectId, vendors, categories, flo
   );
 }
 
-function RootDropZone({ active, label }: { active: boolean; label: string }) {
-  const { isOver, setNodeRef } = useDroppable({ id: "root-drop" });
+function RootDropZone({ id, active, label }: { id: string; active: boolean; label: string }) {
+  const { isOver, setNodeRef } = useDroppable({ id });
   if (!active) return null;
   return (
-    <div ref={setNodeRef} className={`mb-3 flex items-center justify-center gap-2 rounded-xl border-2 border-dashed p-3 text-xs font-semibold transition-all ${isOver ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]" : "border-[var(--border)] text-[var(--fg-muted)]"}`}>
+    <div ref={setNodeRef} className={`my-3 flex min-h-[56px] items-center justify-center gap-2 rounded-xl border-2 border-dashed p-3 text-xs font-semibold transition-all ${isOver ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]" : "border-[var(--border)] text-[var(--fg-muted)]"}`}>
       <CornerLeftUp size={14} />{label}
+    </div>
+  );
+}
+
+function RootDropArea({ active, children }: { active: boolean; children: React.ReactNode }) {
+  const { isOver, setNodeRef } = useDroppable({ id: "root-drop-area" });
+  return (
+    <div ref={setNodeRef} className={`rounded-xl p-1 transition-colors ${active && isOver ? "bg-[var(--accent-soft)]/40" : ""}`}>
+      {children}
     </div>
   );
 }

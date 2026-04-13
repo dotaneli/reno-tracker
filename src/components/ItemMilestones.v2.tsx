@@ -4,7 +4,8 @@ import { useState, useMemo } from "react";
 import { useI18n } from "@/lib/i18n";
 import { useApi } from "@/hooks/useApi";
 import { StatusBadge } from "./StatusBadge";
-import { Plus, Upload, CheckCircle2, Trash2, FileText, Pencil, X, ChevronDown } from "lucide-react";
+import { ReceiptViewer } from "./ReceiptViewer";
+import { Plus, Upload, CheckCircle2, Trash2, Pencil, X, ChevronDown } from "lucide-react";
 import { mutate } from "swr";
 
 const input = "w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm text-[var(--fg)] placeholder-[var(--fg-muted)]/60 outline-none focus:border-[var(--accent)]";
@@ -148,8 +149,8 @@ export function ItemMilestones({ itemId, expectedCost, onMutate: onParentMutate,
           <div className="flex gap-2">
             <label className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 py-2 text-xs text-[var(--fg-muted)] hover:border-[var(--accent)]">
               <Upload size={12} />
-              {editFile ? editFile.name.slice(0, 15) : "PDF"}
-              <input type="file" accept=".pdf" onChange={(e) => setEditFile(e.target.files?.[0] || null)} className="hidden" />
+              {editFile ? editFile.name.slice(0, 15) : t("receipt.file")}
+              <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => setEditFile(e.target.files?.[0] || null)} className="hidden" />
             </label>
             <button type="submit" className="flex-1 rounded-lg bg-[var(--accent)] py-2 text-xs font-semibold text-white">{t("task.save")}</button>
             <button type="button" onClick={() => setEditId(null)} className="rounded-lg bg-[var(--border-subtle)] px-4 py-2 text-xs text-[var(--fg-secondary)]">{t("task.cancel")}</button>
@@ -178,9 +179,9 @@ export function ItemMilestones({ itemId, expectedCost, onMutate: onParentMutate,
               <p className="text-xs text-[var(--fg-muted)] mt-0.5">{fmtDate(m.dueDate)}</p>
             )}
             {m.receiptUrl && (
-              <a href={m.receiptUrl} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex items-center gap-0.5 text-xs text-[var(--accent)] hover:underline">
-                <FileText size={10} />{m.receiptName || "PDF"}
-              </a>
+              <div className="mt-1">
+                <ReceiptViewer url={m.receiptUrl} name={m.receiptName} />
+              </div>
             )}
           </div>
 
@@ -288,8 +289,8 @@ export function ItemMilestones({ itemId, expectedCost, onMutate: onParentMutate,
             <input type="date" value={addForm.dueDate} onChange={(e) => setAddForm({ ...addForm, dueDate: e.target.value })} className={`${input} flex-1`} placeholder={t("item.dueDate")} />
             <label className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 py-2 text-xs text-[var(--fg-muted)] hover:border-[var(--accent)]">
               <Upload size={12} />
-              {file ? file.name.slice(0, 15) : "PDF"}
-              <input type="file" accept=".pdf" onChange={(e) => setFile(e.target.files?.[0] || null)} className="hidden" />
+              {file ? file.name.slice(0, 15) : t("receipt.file")}
+              <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => setFile(e.target.files?.[0] || null)} className="hidden" />
             </label>
           </div>
           <div className="flex gap-2">
