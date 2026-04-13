@@ -7,12 +7,13 @@ import { logAction } from "@/lib/actionlog";
 import { log } from "@/lib/logger";
 import Anthropic from "@anthropic-ai/sdk";
 
-// Allow up to 60 seconds for AI response with tool calls
-export const maxDuration = 60;
+// Allow up to 5 minutes for AI response with tool calls — Vercel Fluid Compute default.
+export const maxDuration = 300;
 
 const RATE_LIMIT_PER_DAY = 50;
 const MAX_HISTORY = 20;
-const MODEL = "claude-sonnet-4-20250514";
+// Latest Sonnet (Claude 4.6) — faster + better tool use than the May 2025 build.
+const MODEL = "claude-sonnet-4-6";
 
 interface ChatRequestBody {
   message: string;
@@ -192,7 +193,7 @@ Use widgets when showing summaries, financial breakdowns, task status overviews,
 
           // Agentic loop: max 3 rounds of tool use to prevent excessive API calls
           let rounds = 0;
-          const MAX_ROUNDS = 3;
+          const MAX_ROUNDS = 8;
           while (rounds < MAX_ROUNDS) {
             rounds++;
             const stream = client.messages.stream({
