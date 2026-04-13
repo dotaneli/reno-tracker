@@ -153,10 +153,13 @@ Use widgets when showing summaries, financial breakdowns, task status overviews,
     if (body.file?.base64) {
       tools.push({
         name: "attach_receipt",
-        description: `Save the file the user just attached ("${body.file.name}", ${body.file.type}) as a receipt on a specific task. Use this whenever the user uploads a receipt with their message. Only takes nodeId — the file content is already provided in this request.`,
+        description: `Save the file the user just attached ("${body.file.name}", ${body.file.type}) as a receipt. ALWAYS pass nodeId. If the receipt is for a specific payment milestone, ALSO pass milestoneId — this attaches the file directly to that payment so it shows inline with the milestone. Otherwise it is saved as a task-level receipt. The file content is handled automatically.`,
         input_schema: {
           type: "object",
-          properties: { nodeId: { type: "string", description: "The task ID to attach the receipt to" } },
+          properties: {
+            nodeId: { type: "string", description: "The task ID the receipt belongs to (always required)" },
+            milestoneId: { type: "string", description: "Optional: attach to a specific payment milestone instead of the task as a whole" },
+          },
           required: ["nodeId"],
         } as Anthropic.Tool.InputSchema,
       });
@@ -272,17 +275,31 @@ Use widgets when showing summaries, financial breakdowns, task status overviews,
                 try {
                   let result: any;
                   if (tool.name === "attach_receipt") {
-                    // Chat-only tool: save the pending file from body.file onto the given node
+                    // Chat-only tool: save the pending file from body.file onto the given node (or milestone)
                     if (!body.file?.base64) throw new Error("No file is attached to this request");
                     const nodeId: string = tool.input?.nodeId;
+                    const milestoneId: string | undefined = tool.input?.milestoneId;
                     if (!nodeId) throw new Error("nodeId is required");
                     const { projectId } = await requireNodeAccess(userId, nodeId, ["OWNER", "EDITOR"]);
-                    const up = await uploadBase64File(body.file.name, body.file.base64, `receipts/${nodeId}`);
-                    const receipt = await prisma.receipt.create({
-                      data: { fileUrl: up.url, fileName: up.name, fileSize: up.size, nodeId },
-                    });
-                    await logAction(projectId, userId, "CREATE", "receipt", receipt.id, null, receipt);
-                    result = receipt;
+                    if (milestoneId) {
+                      // Verify the milestone belongs to this node
+                      const ms = await prisma.paymentMilestone.findUnique({ where: { id: milestoneId }, select: { nodeId: true } });
+                      if (!ms || ms.nodeId !== nodeId) throw new Error("milestoneId does not belong to this node");
+                      const up = await uploadBase64File(body.file.name, body.file.base64, `receipts/${nodeId}`);
+                      const updated = await prisma.paymentMilestone.update({
+                        where: { id: milestoneId },
+                        data: { receiptUrl: up.url, receiptName: up.name },
+                      });
+                      await logAction(projectId, userId, "UPDATE", "milestone", milestoneId, null, updated);
+                      result = updated;
+                    } else {
+                      const up = await uploadBase64File(body.file.name, body.file.base64, `receipts/${nodeId}`);
+                      const receipt = await prisma.receipt.create({
+                        data: { fileUrl: up.url, fileName: up.name, fileSize: up.size, nodeId },
+                      });
+                      await logAction(projectId, userId, "CREATE", "receipt", receipt.id, null, receipt);
+                      result = receipt;
+                    }
                   } else {
                     result = await executeTool(tool.name, tool.input, auth);
                   }

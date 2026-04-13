@@ -106,6 +106,8 @@ const dict = {
   "receipt.download": { en: "Download", he: "הורדה" },
   "receipt.close": { en: "Close", he: "סגור" },
   "receipt.file": { en: "File", he: "קובץ" },
+  "receipt.uploaded": { en: "Uploaded receipts", he: "קבלות שהועלו" },
+  "receipt.deleteConfirm": { en: "Delete this receipt?", he: "למחוק את הקבלה?" },
   "task.markDone": { en: "Mark as Done", he: "סמן כהושלם" },
   "task.markedDone": { en: "Marked as done", he: "סומן כהושלם" },
   "general.undo": { en: "Undo", he: "בטל" },

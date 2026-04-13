@@ -30,13 +30,21 @@ export function ItemMilestones({ itemId, expectedCost, onMutate: onParentMutate,
   // Use prefetched data if available, otherwise fetch per-item (fallback)
   const { data: fetchedMilestones } = useApi<any[]>(prefetchedMilestones ? null : `/api/nodes/${itemId}/milestones`, { keepPreviousData: true });
   const milestones = prefetchedMilestones || fetchedMilestones;
+  const { data: receipts } = useApi<any[]>(`/api/nodes/${itemId}/receipts`, { keepPreviousData: true });
   const mutateMilestones = () => { mutate(`/api/nodes/${itemId}/milestones`); onParentMutate?.(); };
+  const mutateReceipts = () => { mutate(`/api/nodes/${itemId}/receipts`); onParentMutate?.(); };
+
+  const deleteReceipt = async (receiptId: string) => {
+    if (!confirm(t("receipt.deleteConfirm"))) return;
+    await fetch(`/api/nodes/${itemId}/receipts`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ receiptId }) });
+    mutateReceipts();
+  };
 
   const fmt = (n: number) =>
     new Intl.NumberFormat(lang === "he" ? "he-IL" : "en-IL", { style: "currency", currency: "ILS", maximumFractionDigits: 0 }).format(n);
 
-  const totalPaid = milestones?.filter((m: any) => m.status === "PAID").reduce((s: number, m: any) => s + Number(m.amount), 0) || 0;
-  const totalDue = milestones?.reduce((s: number, m: any) => s + Number(m.amount), 0) || 0;
+  const totalPaid = (milestones ?? []).filter((m: any) => m.status === "PAID").reduce((s: number, m: any) => s + Number(m.amount), 0);
+  const totalDue = (milestones ?? []).reduce((s: number, m: any) => s + Number(m.amount), 0);
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,12 +90,14 @@ export function ItemMilestones({ itemId, expectedCost, onMutate: onParentMutate,
     mutateMilestones();
   };
 
-  if (!milestones) return null;
+  const milestonesList: any[] = milestones ?? [];
+  const receiptsList: any[] = receipts ?? [];
+  if (!milestones && !receipts) return null;
 
   return (
     <div className="mt-3 border-t border-[var(--border-subtle)] pt-3">
       {/* Summary bar */}
-      {milestones.length > 0 && (
+      {milestonesList.length > 0 && (
         <div className="mb-3 flex items-center gap-3 text-xs">
           <span className="text-[var(--fg-muted)]">{t("costs.totalPaid")}: <strong className="text-[var(--success)]">{fmt(totalPaid)}</strong></span>
           <span className="text-[var(--fg-muted)]">/ {fmt(totalDue)}</span>
@@ -98,7 +108,7 @@ export function ItemMilestones({ itemId, expectedCost, onMutate: onParentMutate,
       )}
 
       {/* Payments list */}
-      {milestones.map((m: any) => (
+      {milestonesList.map((m: any) => (
         <div key={m.id} className="mb-2">
           {editId === m.id ? (
             /* ── Inline edit ── */
@@ -161,6 +171,27 @@ export function ItemMilestones({ itemId, expectedCost, onMutate: onParentMutate,
           )}
         </div>
       ))}
+
+      {/* Standalone receipts (uploaded via AI chat or upload_receipt tool — not tied to a specific milestone) */}
+      {receiptsList.length > 0 && (
+        <div className="mb-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg)] p-3">
+          <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-[var(--fg-muted)]">{t("receipt.uploaded")} ({receiptsList.length})</p>
+          <div className="flex flex-wrap items-start gap-2">
+            {receiptsList.map((r: any) => (
+              <div key={r.id} className="flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-1.5">
+                <ReceiptViewer url={r.fileUrl} name={r.fileName} />
+                <div className="min-w-0">
+                  <p className="truncate text-[11px] font-medium text-[var(--fg)] max-w-[140px]">{r.fileName}</p>
+                  <p className="text-[9px] text-[var(--fg-muted)]">{new Date(r.uploadedAt).toLocaleDateString(lang === "he" ? "he-IL" : "en-IL", { day: "numeric", month: "short" })}</p>
+                </div>
+                <button onClick={() => deleteReceipt(r.id)} className="rounded-md p-1 text-[var(--fg-muted)] hover:bg-[var(--alert-soft)] hover:text-[var(--alert)]" title={t("crud.delete")}>
+                  <Trash2 size={11} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Add form */}
       {showAddForm ? (

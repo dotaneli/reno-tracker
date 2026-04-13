@@ -38,7 +38,16 @@ export function ItemMilestones({ itemId, expectedCost, onMutate: onParentMutate,
   // Use prefetched data if available, otherwise fetch per-item (fallback)
   const { data: fetchedMilestones } = useApi<any[]>(prefetchedMilestones ? null : `/api/nodes/${itemId}/milestones`, { keepPreviousData: true });
   const milestones = prefetchedMilestones || fetchedMilestones;
+  const { data: receipts } = useApi<any[]>(`/api/nodes/${itemId}/receipts`, { keepPreviousData: true });
+  const receiptsList: any[] = receipts ?? [];
   const mutateMilestones = () => { mutate(`/api/nodes/${itemId}/milestones`); onParentMutate?.(); };
+  const mutateReceipts = () => { mutate(`/api/nodes/${itemId}/receipts`); onParentMutate?.(); };
+
+  const deleteReceipt = async (receiptId: string) => {
+    if (!confirm(t("receipt.deleteConfirm"))) return;
+    await fetch(`/api/nodes/${itemId}/receipts`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ receiptId }) });
+    mutateReceipts();
+  };
 
   const fmt = (n: number) =>
     new Intl.NumberFormat(lang === "he" ? "he-IL" : "en-IL", { style: "currency", currency: "ILS", maximumFractionDigits: 0 }).format(n);
@@ -263,6 +272,27 @@ export function ItemMilestones({ itemId, expectedCost, onMutate: onParentMutate,
               {paid.map(renderCard)}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Standalone receipts (uploaded via AI chat or upload_receipt tool — not tied to a specific milestone) */}
+      {receiptsList.length > 0 && (
+        <div className="mb-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-3">
+          <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-[var(--fg-muted)]">{t("receipt.uploaded")} ({receiptsList.length})</p>
+          <div className="flex flex-wrap items-start gap-2">
+            {receiptsList.map((r: any) => (
+              <div key={r.id} className="flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg)] p-1.5">
+                <ReceiptViewer url={r.fileUrl} name={r.fileName} />
+                <div className="min-w-0">
+                  <p className="truncate text-[11px] font-medium text-[var(--fg)] max-w-[140px]">{r.fileName}</p>
+                  <p className="text-[9px] text-[var(--fg-muted)]">{new Date(r.uploadedAt).toLocaleDateString(lang === "he" ? "he-IL" : "en-IL", { day: "numeric", month: "short" })}</p>
+                </div>
+                <button onClick={() => deleteReceipt(r.id)} className="rounded-md p-1 text-[var(--fg-muted)] hover:bg-[var(--alert-soft)] hover:text-[var(--alert)]" title={t("crud.delete")}>
+                  <Trash2 size={11} />
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
