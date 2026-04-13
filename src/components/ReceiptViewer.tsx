@@ -10,16 +10,42 @@ interface Props {
   className?: string;
 }
 
-function isImage(url: string, name?: string | null): boolean {
-  const target = (name || url).toLowerCase().split("?")[0];
-  return /\.(jpe?g|png|gif|webp|avif)$/.test(target);
+/** Detect image vs pdf from the stored filename OR the URL's pathname. Falls back to pdf. */
+function detectKind(url: string, name?: string | null): "image" | "pdf" {
+  // Prefer the stored name — it's explicit. Fall back to URL pathname (strip querystring).
+  const target = (name || url.split("?")[0]).toLowerCase();
+  if (/\.pdf$/.test(target)) return "pdf";
+  if (/\.(jpe?g|png|gif|webp|avif)$/.test(target)) return "image";
+  return "pdf";
+}
+
+/**
+ * Cross-origin-safe download: fetch the blob then trigger a download with
+ * the intended filename. The HTML `download` attribute is ignored by browsers
+ * when the href is on a different origin (which Vercel Blob always is), so
+ * a plain <a download="..."> just opens the file in a new tab instead of
+ * saving it — that's why PDF receipts were opening inline as a preview.
+ */
+async function downloadBlob(url: string, filename: string) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Download failed: ${res.status}`);
+  const blob = await res.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = objectUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
 }
 
 export function ReceiptViewer({ url, name, className }: Props) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
-  const image = isImage(url, name);
-  const displayName = name || (image ? "image" : "receipt.pdf");
+  const kind = detectKind(url, name);
+  const image = kind === "image";
+  const displayName = name || (image ? "receipt.jpg" : "receipt.pdf");
 
   useEffect(() => {
     if (!open) return;
@@ -56,16 +82,18 @@ export function ReceiptViewer({ url, name, className }: Props) {
             <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-3">
               <span className="truncate text-sm font-semibold text-[var(--fg)]">{displayName}</span>
               <div className="flex items-center gap-2">
-                <a
-                  href={url}
-                  download={displayName}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  type="button"
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    try { await downloadBlob(url, displayName); }
+                    catch { window.open(url, "_blank", "noopener,noreferrer"); }
+                  }}
                   className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent)] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
                 >
                   <Download size={12} />
                   {t("receipt.download")}
-                </a>
+                </button>
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
