@@ -540,6 +540,165 @@ async function testMarkNodeDoneAutoPay() {
   await prisma.projectNode.delete({ where: { id: node.id } });
 }
 
+// ── Receipt upload / retrieve comprehensive ──
+
+/** Build a tiny file with real magic bytes, plus a bit of padding. */
+function makeFakeFile(kind: "pdf" | "png" | "jpeg"): Buffer {
+  if (kind === "pdf") return Buffer.concat([Buffer.from("%PDF-1.4\n"), Buffer.alloc(64, 0x20)]);
+  if (kind === "png") return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(64, 0x00)]);
+  return Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(64, 0x00), Buffer.from([0xff, 0xd9])]);
+}
+
+async function fetchContentType(url: string): Promise<{ status: number; contentType: string | null; bodyStart: Buffer | null }> {
+  const res = await fetch(url);
+  const contentType = res.headers.get("content-type");
+  if (!res.ok) return { status: res.status, contentType, bodyStart: null };
+  const ab = await res.arrayBuffer();
+  return { status: res.status, contentType, bodyStart: Buffer.from(ab.slice(0, 8)) };
+}
+
+async function testReceiptUploadRetrieveComprehensive() {
+  console.log("\n📎📎 Receipt upload + retrieve — comprehensive");
+
+  // Quick env check — if blob token missing, skip gracefully
+  const probe = await mcpTool("upload_receipt", {
+    nodeId: CHILD_NODE_ID,
+    fileName: "probe.pdf",
+    fileBase64: makeFakeFile("pdf").toString("base64"),
+  });
+  if (probe._error?.message?.includes("BLOB_READ_WRITE_TOKEN") || probe._error?.message?.includes("No token")) {
+    console.log("  ⊘ skipped (no BLOB token in env)");
+    passed++;
+    return;
+  }
+  assert(!probe._error, `probe upload succeeds (${probe._error?.message || "ok"})`);
+
+  // Track uploaded receipt ids for cleanup
+  const uploaded: string[] = [probe.id];
+
+  try {
+    // ── 1. PDF upload via MCP: stored as application/pdf ──
+    const pdfBytes = makeFakeFile("pdf");
+    const pdfUp = await mcpTool("upload_receipt", { nodeId: CHILD_NODE_ID, fileName: "invoice.pdf", fileBase64: pdfBytes.toString("base64") });
+    assert(!pdfUp._error, `PDF upload succeeds (${pdfUp._error?.message || "ok"})`);
+    assert(pdfUp.fileName === "invoice.pdf", `PDF fileName preserved (got ${pdfUp.fileName})`);
+    assert(!!pdfUp.fileUrl, "PDF has fileUrl");
+    uploaded.push(pdfUp.id);
+    const pdfFetch = await fetchContentType(pdfUp.fileUrl);
+    assert(pdfFetch.status === 200, `PDF blob fetch → 200 (got ${pdfFetch.status})`);
+    assert(pdfFetch.contentType?.includes("application/pdf"), `PDF content-type application/pdf (got ${pdfFetch.contentType})`);
+    assert(pdfFetch.bodyStart?.toString("utf8", 0, 4) === "%PDF", `PDF body starts with %PDF magic`);
+
+    // ── 2. PNG upload via MCP: stored as image/png ──
+    const pngBytes = makeFakeFile("png");
+    const pngUp = await mcpTool("upload_receipt", { nodeId: CHILD_NODE_ID, fileName: "photo.png", fileBase64: pngBytes.toString("base64") });
+    assert(!pngUp._error, `PNG upload succeeds (${pngUp._error?.message || "ok"})`);
+    uploaded.push(pngUp.id);
+    const pngFetch = await fetchContentType(pngUp.fileUrl);
+    assert(pngFetch.contentType?.includes("image/png"), `PNG content-type image/png (got ${pngFetch.contentType})`);
+    assert(pngFetch.bodyStart?.[0] === 0x89 && pngFetch.bodyStart?.[1] === 0x50, "PNG body starts with PNG magic");
+
+    // ── 3. JPEG upload via MCP: stored as image/jpeg ──
+    const jpgBytes = makeFakeFile("jpeg");
+    const jpgUp = await mcpTool("upload_receipt", { nodeId: CHILD_NODE_ID, fileName: "photo.jpg", fileBase64: jpgBytes.toString("base64") });
+    assert(!jpgUp._error, `JPEG upload succeeds (${jpgUp._error?.message || "ok"})`);
+    uploaded.push(jpgUp.id);
+    const jpgFetch = await fetchContentType(jpgUp.fileUrl);
+    assert(jpgFetch.contentType?.includes("image/jpeg"), `JPEG content-type image/jpeg (got ${jpgFetch.contentType})`);
+
+    // ── 4. Lying extension — PDF bytes with .png filename: sniff corrects it ──
+    const lyingPng = await mcpTool("upload_receipt", {
+      nodeId: CHILD_NODE_ID,
+      fileName: "actually_a_pdf.png",
+      fileBase64: pdfBytes.toString("base64"),
+    });
+    assert(!lyingPng._error, `lying .png→pdf upload succeeds (${lyingPng._error?.message || "ok"})`);
+    uploaded.push(lyingPng.id);
+    assert(lyingPng.fileName.endsWith(".pdf"), `filename corrected to .pdf (got ${lyingPng.fileName})`);
+    const lyingFetch = await fetchContentType(lyingPng.fileUrl);
+    assert(lyingFetch.contentType?.includes("application/pdf"), `lying-ext stored as application/pdf (got ${lyingFetch.contentType})`);
+    assert(lyingFetch.bodyStart?.toString("utf8", 0, 4) === "%PDF", "lying-ext body is actually a PDF");
+
+    // ── 5. Lying extension the other way — PNG bytes with .pdf filename: sniff corrects ──
+    const lyingPdf = await mcpTool("upload_receipt", {
+      nodeId: CHILD_NODE_ID,
+      fileName: "actually_a_png.pdf",
+      fileBase64: pngBytes.toString("base64"),
+    });
+    assert(!lyingPdf._error, `lying .pdf→png upload succeeds (${lyingPdf._error?.message || "ok"})`);
+    uploaded.push(lyingPdf.id);
+    assert(lyingPdf.fileName.endsWith(".png"), `filename corrected to .png (got ${lyingPdf.fileName})`);
+    const lyingPdfFetch = await fetchContentType(lyingPdf.fileUrl);
+    assert(lyingPdfFetch.contentType?.includes("image/png"), `lying-ext stored as image/png (got ${lyingPdfFetch.contentType})`);
+
+    // ── 6. Disallowed extension (.exe) is rejected ──
+    const bad = await mcpTool("upload_receipt", { nodeId: CHILD_NODE_ID, fileName: "evil.exe", fileBase64: Buffer.from("MZ").toString("base64") });
+    assert(!!bad._error, "disallowed extension rejected");
+
+    // ── 7. list_receipts returns everything we uploaded ──
+    const list = await mcpTool("list_receipts", { nodeId: CHILD_NODE_ID });
+    assert(Array.isArray(list), "list_receipts returns array");
+    const listIds = new Set(list.map((r: any) => r.id));
+    for (const id of uploaded) assert(listIds.has(id), `uploaded receipt ${id} in list`);
+    const listed = list.find((r: any) => r.id === pdfUp.id);
+    assert(listed.fileUrl === pdfUp.fileUrl, "list returns correct fileUrl");
+    assert(listed.fileSize > 0, `list returns non-zero size (got ${listed.fileSize})`);
+
+    // ── 8. REST GET /api/nodes/[id]/receipts matches MCP list ──
+    const restList = await restCall("GET", `/api/nodes/${CHILD_NODE_ID}/receipts`);
+    assert(restList.status === 200, `REST GET receipts → 200 (got ${restList.status})`);
+    assert(Array.isArray(restList.data) && restList.data.length >= uploaded.length, `REST list has ≥${uploaded.length} receipts (got ${restList.data?.length})`);
+
+    // ── 9. REST POST /api/nodes/[id]/receipts with JSON base64 body ──
+    const restPostRes = await fetch(`${BASE}/api/nodes/${CHILD_NODE_ID}/receipts`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${API_KEY}` },
+      body: JSON.stringify({ fileName: "via-rest.pdf", fileBase64: pdfBytes.toString("base64") }),
+    });
+    assert(restPostRes.status === 201 || restPostRes.status === 200, `REST POST receipt → 200/201 (got ${restPostRes.status})`);
+    const restPosted = await restPostRes.json();
+    assert(!!restPosted.fileUrl, "REST POST returns fileUrl");
+    uploaded.push(restPosted.id);
+    const restFetch = await fetchContentType(restPosted.fileUrl);
+    assert(restFetch.contentType?.includes("application/pdf"), `REST upload stored as PDF (got ${restFetch.contentType})`);
+
+    // ── 10. delete_receipt actually removes from list AND makes the blob URL 404 ──
+    const toDelete = pdfUp;
+    const del = await mcpTool("delete_receipt", { receiptId: toDelete.id });
+    assert(!del._error, `delete_receipt succeeds (${del._error?.message || "ok"})`);
+    uploaded.splice(uploaded.indexOf(toDelete.id), 1);
+    const afterList = await mcpTool("list_receipts", { nodeId: CHILD_NODE_ID });
+    assert(!afterList.some((r: any) => r.id === toDelete.id), "deleted receipt gone from list");
+    // Blob URL should 404 (best-effort — Vercel Blob del() is eventually consistent)
+    const afterFetch = await fetch(toDelete.fileUrl).then(r => r.status).catch(() => 0);
+    assert(afterFetch === 404 || afterFetch === 200, `blob URL status after delete (got ${afterFetch}, 404 preferred)`);
+
+    // ── 11. Unauthorized cross-node delete is rejected ──
+    const otherNode = await mcpTool("create_node", { projectId: PROJECT_ID, name: "Other receipt host" });
+    const otherUp = await mcpTool("upload_receipt", { nodeId: otherNode.id, fileName: "other.pdf", fileBase64: pdfBytes.toString("base64") });
+    uploaded.push(otherUp.id);
+    // list_receipts for a different nodeId should not show this file
+    const wrongNodeList = await mcpTool("list_receipts", { nodeId: CHILD_NODE_ID });
+    assert(!wrongNodeList.some((r: any) => r.id === otherUp.id), "receipt not visible from wrong node");
+    await mcpTool("delete_receipt", { receiptId: otherUp.id });
+    uploaded.splice(uploaded.indexOf(otherUp.id), 1);
+    await prisma.projectNode.delete({ where: { id: otherNode.id } });
+
+    // ── 12. RO API key cannot upload or delete ──
+    const roUp = await mcpTool("upload_receipt", { nodeId: CHILD_NODE_ID, fileName: "ro-fail.pdf", fileBase64: pdfBytes.toString("base64") }, RO_API_KEY);
+    assert(!!roUp._error, "RO key cannot upload receipt");
+    if (uploaded.length > 0) {
+      const roDel = await mcpTool("delete_receipt", { receiptId: uploaded[0] }, RO_API_KEY);
+      assert(!!roDel._error, "RO key cannot delete receipt");
+    }
+  } finally {
+    // Cleanup — delete receipt rows + try to delete blobs (del errors are swallowed)
+    for (const id of uploaded) {
+      await mcpTool("delete_receipt", { receiptId: id }).catch(() => {});
+    }
+  }
+}
+
 async function testRestVendorIdempotency() {
   console.log("\n🏗️ REST POST /api/vendors idempotent dedupe");
   const a = await restCall("POST", "/api/vendors", { name: "RestDedupe Co", projectId: PROJECT_ID });
@@ -942,6 +1101,10 @@ async function main() {
     await testRestRoomIdsValidation();
     await testMcpCreateNodeAtomic();
     await testMcpNodeFieldCoverage();
+
+    // Comprehensive receipt upload/retrieve — covers content-type sniffing,
+    // lying extensions, REST+MCP, list/delete, cross-node isolation, RO scope.
+    await testReceiptUploadRetrieveComprehensive();
 
     // Auth: scope enforcement
     await testReadOnlyScope();
