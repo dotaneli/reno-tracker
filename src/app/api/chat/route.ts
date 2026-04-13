@@ -1,7 +1,9 @@
-import { resolveAuth, requireProjectAccess, AuthError } from "@/lib/dal";
+import { resolveAuth, requireProjectAccess, requireNodeAccess, AuthError } from "@/lib/dal";
 import { handleError, errorResponse } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
 import { TOOLS, executeTool } from "@/lib/mcp-server";
+import { uploadBase64File } from "@/lib/file-upload";
+import { logAction } from "@/lib/actionlog";
 import { log } from "@/lib/logger";
 import Anthropic from "@anthropic-ai/sdk";
 
@@ -101,7 +103,11 @@ VISUAL WIDGETS: You can render rich dashboard widgets by outputting fenced code 
 {"type":"status-list","items":[{"name":"Kitchen Cabinets","status":"COMPLETED","detail":"₪85,000"},{"name":"Plumbing","status":"IN_PROGRESS","detail":"₪22,000"}]}
 \`\`\`
 
-Use widgets when showing summaries, financial breakdowns, task status overviews, or payment schedules. Combine widgets with text explanations. Use regular markdown tables for detailed data.`;
+Use widgets when showing summaries, financial breakdowns, task status overviews, or payment schedules. Combine widgets with text explanations. Use regular markdown tables for detailed data.${
+  body.file?.base64
+    ? `\n\nATTACHED FILE: The user has attached a file named "${body.file.name}" (${body.file.type}) with this message. To save it as a receipt for a task, call the \`attach_receipt\` tool with the target nodeId — do NOT try to pass any file contents, they are handled automatically. Existing receipts can be listed with \`list_receipts\` and removed with \`delete_receipt\`.`
+    : ""
+}`;
 
     // Build messages array
     const messages: Anthropic.MessageParam[] = [
@@ -141,6 +147,20 @@ Use widgets when showing summaries, financial breakdowns, task status overviews,
         description: t.description,
         input_schema: t.inputSchema as Anthropic.Tool.InputSchema,
       }));
+
+    // When the user attaches a file, expose a chat-only tool that saves it as a receipt.
+    // Claude cannot re-emit the base64 itself, so we inject it server-side from body.file.
+    if (body.file?.base64) {
+      tools.push({
+        name: "attach_receipt",
+        description: `Save the file the user just attached ("${body.file.name}", ${body.file.type}) as a receipt on a specific task. Use this whenever the user uploads a receipt with their message. Only takes nodeId — the file content is already provided in this request.`,
+        input_schema: {
+          type: "object",
+          properties: { nodeId: { type: "string", description: "The task ID to attach the receipt to" } },
+          required: ["nodeId"],
+        } as Anthropic.Tool.InputSchema,
+      });
+    }
 
     // Save user message now (before streaming)
     await prisma.chatMessage.create({
@@ -250,7 +270,22 @@ Use widgets when showing summaries, financial breakdowns, task status overviews,
               const toolResults: Anthropic.ToolResultBlockParam[] = [];
               for (const tool of toolUseBlocks) {
                 try {
-                  const result = await executeTool(tool.name, tool.input, auth);
+                  let result: any;
+                  if (tool.name === "attach_receipt") {
+                    // Chat-only tool: save the pending file from body.file onto the given node
+                    if (!body.file?.base64) throw new Error("No file is attached to this request");
+                    const nodeId: string = tool.input?.nodeId;
+                    if (!nodeId) throw new Error("nodeId is required");
+                    const { projectId } = await requireNodeAccess(userId, nodeId, ["OWNER", "EDITOR"]);
+                    const up = await uploadBase64File(body.file.name, body.file.base64, `receipts/${nodeId}`);
+                    const receipt = await prisma.receipt.create({
+                      data: { fileUrl: up.url, fileName: up.name, fileSize: up.size, nodeId },
+                    });
+                    await logAction(projectId, userId, "CREATE", "receipt", receipt.id, null, receipt);
+                    result = receipt;
+                  } else {
+                    result = await executeTool(tool.name, tool.input, auth);
+                  }
                   toolResults.push({
                     type: "tool_result",
                     tool_use_id: tool.id,
